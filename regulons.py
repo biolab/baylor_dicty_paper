@@ -10,6 +10,7 @@ import sklearn.preprocessing as pp
 
 # ***************
 # *** Helper functions
+# TODO check helper functions (arguments, descriptions)
 SCALING = 'mean0std1'
 LOG = True
 
