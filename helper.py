@@ -1,6 +1,7 @@
 import pandas as pd
 import pickle
 
+PATH_RESULTS='/home/karin/Documents/git/baylor_dicty_paper/Results/'
 
 GROUPS = {'amiB': 'agg-', 'mybB': 'agg-', 'acaA': 'agg-', 'gtaC': 'agg-',
           'gbfA': 'lag_dis', 'tgrC1': 'lag_dis', 'tgrB1': 'tag_dis', 'tgrB1C1': 'tag_dis',
