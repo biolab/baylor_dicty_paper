@@ -360,7 +360,7 @@ def adjust_axes_lim(ax: plt.Axes, min_x_thresh: float, max_x_thresh: float, min_
 # *** Load data
 path_save = PATH_RESULTS + 'PC1vsTime/'
 if not os.path.exists(path_save):
-    os.makedirs(PATH_RESULTS + 'PC1vsTime/')
+    os.makedirs(path_save)
 path_data = '/home/karin/Documents/timeTrajectories/data/RPKUM/combined/'
 
 genes = pd.read_csv(path_data + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)

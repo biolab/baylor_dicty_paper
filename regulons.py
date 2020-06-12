@@ -1,5 +1,6 @@
 import warnings
 import glob
+import os
 
 import numpy as np
 import pandas as pd
@@ -7,19 +8,17 @@ import pandas as pd
 from pynndescent import NNDescent
 import sklearn.preprocessing as pp
 
-from helper import *
+from helper import  merge_genes_conditions, split_data, save_pickle, load_pickle, PATH_RESULTS
 
 # ***************
 # *** Helper functions
-# TODO check helper functions (arguments, descriptions)
 SCALING = 'mean0std1'
 LOG = True
+
 
 class NeighbourCalculator:
     """
     Obtains best neighbours of genes based on their expression profile.
-    This can be done for all conditions at once or by condition groups, later on merging the results into
-    single neighbour data.
     """
 
     MINMAX = 'minmax'
@@ -27,26 +26,15 @@ class NeighbourCalculator:
     NONE = 'none'
     SCALES = [MINMAX, MEANSTD, NONE]
 
-    def __init__(self, genes: pd.DataFrame, remove_zero: bool = True, conditions: pd.DataFrame = None,
-                 conditions_names_column=None):
+    def __init__(self, genes: pd.DataFrame, remove_zero: bool = True):
         """
-        :param genes: Data frame of genes in rows and conditions in columns. Index is treated as gene names
+        :param genes: Data frame of genes in rows and samples in columns. Index is treated as gene names
         :param remove_zero: Remove genes that have all expression values 0.
-            If batches are latter specified there may be all 0 rows within individual batches.
-        :param conditions: data frame with conditions for genes subseting, measurements (M) in rows;
-            conditions table dimensions are M*D (D are description types).
-            Rows should have same order  as genes table  columns (specified upon initialisation, dimension G(genes)*M) -
-            column names of gene table and specified column in conditions table should match.
-        :param conditions_names_column: conditions table column that matches genes index - tests that have same order
         """
         NeighbourCalculator.check_numeric(genes)
         if remove_zero:
             genes = genes[(genes != 0).any(axis=1)]
         self._genes = genes
-        if conditions is not None:
-            if list(conditions.loc[:, conditions_names_column]) != list(self._genes.columns):
-                raise ValueError('Conditions table row order must match genes table column order.')
-        self.conditions = conditions
 
     @staticmethod
     def check_numeric(expression: pd.DataFrame):
@@ -59,98 +47,70 @@ class NeighbourCalculator:
             raise ValueError('Expression data is not numeric.')
 
     def neighbours(self, n_neighbours: int, inverse: bool, scale: str = SCALING, log: bool = LOG,
-                   batches: list = None, remove_batch_zero: bool = True, return_neigh_dist: bool = False,
-                   genes_query_names: list = None, remove_self: bool = False, metric: str = 'cosine'):
+                   return_neigh_dist: bool = False, genes_query_names: list = None, remove_self: bool = False):
         """
-        Calculates neighbours of genes on whole gene data or its subset by column.
-        :param n_neighbours: Number of neighbours to obtain for each gene
-        :param inverse: Calculate most similar neighbours (False) or neighbours with inverse profile (True)
-        :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'
-        :param log: Should expression data be log2 transformed
-        :param batches: Should comparisons be made for each batch separately.
-            Batches should be a list of batch group names for each column (eg. length of batches is n columns of genes).
-        :param remove_batch_zero: Remove genes that have all expression values 0 for each batch individually.
-        :param return_neigh_dist: Instead of parsed dictionary return tuple with NN matrix and similarity matrix,
-        as returned by pynndescent (converted to similarities) but named with gene names in data frame.
-        :param genes_query_names: Use only the specified genes as query.
+        Calculates neighbours of genes based on expression profile across samples (columns). Wrapper for
+        calculate_neighbours.
+        :param n_neighbours: Number of neighbours to obtain for each gene. This will include self for non-inverse.
+        :param inverse: Calculate most similar neighbours (False) or neighbours with inverse profile (True).
+        :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'.
+        :param log: Should expression data be log2(data+pseudocount) transformed before scaling.
+        :param return_neigh_dist: Return tuple with nearest neighbour matrix and similarity matrix data frames,
+            as returned by pynndescent, but with similarity matrix converted to similarities and with added gene
+            names for the index.
+        :param genes_query_names: Use only the specified genes as query (out of all genes).
         :param remove_self: Used only if return_neigh_dist is true. Whether to remove sample from its closest
-        neighbours or not. If retunr_neigh_dist is False this is done automatically. This also removes last
-        column/neighbours is self is not present - should not be used with inverse.
-        :param metric: cosine or correlation (pearson)
-        :return: Dict with gene names as tupple keys (smaller by alphabet is first tuple value) and
-            values representing cosine similarity. If batches are used such dicts are returned for each batch
-            in form of dict with batch names as keys and above mentioned dicts as values. Or see return_neigh_dist.
+            neighbours or not. If return_neigh_dist is False this is done automatically. This also removes the last
+            column of neighbours if self is not present - thus it should not be used with inverse,
+            as self will not be present.
+        :return: Dict with keys being gene pair names tuple (smaller name by alphabet is the first tuple value) and
+            values representing cosine similarity. Or see return_neigh_dist.
         """
         if scale not in self.SCALES:
             raise ValueError('Scale must be:', self.SCALES)
 
         genes = self._genes
 
-        if batches is None:
-            if genes_query_names is not None:
-                genes_query = genes.loc[genes_query_names, :]
-            else:
-                genes_query = None
-            return NeighbourCalculator.calculate_neighbours(genes=genes, n_neighbours=n_neighbours, inverse=inverse,
-                                                            scale=scale,
-                                                            log=log, return_neigh_dist=return_neigh_dist,
-                                                            genes_query_data=genes_query, remove_self=remove_self,
-                                                            metric=metric)
+        if genes_query_names is not None:
+            genes_query = genes.loc[genes_query_names, :]
         else:
-            batch_groups = set(batches)
-            batches = np.array(batches)
-            results = dict()
-            for batch in batch_groups:
-                genes_sub = genes.T[batches == batch].T
-                if remove_batch_zero:
-                    genes_sub = genes_sub[(genes_sub != 0).any(axis=1)]
-
-                if genes_query_names is not None:
-                    genes_query_sub = genes_sub.loc[genes_query_names, :]
-                else:
-                    genes_query_sub = None
-
-                result = NeighbourCalculator.calculate_neighbours(genes=genes_sub, n_neighbours=n_neighbours,
-                                                                  inverse=inverse,
-                                                                  scale=scale, log=log, description=batch,
-                                                                  return_neigh_dist=return_neigh_dist,
-                                                                  genes_query_data=genes_query_sub,
-                                                                  remove_self=remove_self,
-                                                                  metric=metric)
-                results[batch] = result
-            return results
+            genes_query = None
+        return NeighbourCalculator.calculate_neighbours(genes=genes, n_neighbours=n_neighbours, inverse=inverse,
+                                                        scale=scale,
+                                                        log=log, return_neigh_dist=return_neigh_dist,
+                                                        genes_query_data=genes_query, remove_self=remove_self)
 
     @staticmethod
     def calculate_neighbours(genes, n_neighbours: int, inverse: bool, scale: str, log: bool,
                              description: str = '', return_neigh_dist: bool = False,
-                             genes_query_data: pd.DataFrame = None, remove_self: bool = False, metric: str = 'cosine'):
+                             genes_query_data: pd.DataFrame = None, remove_self: bool = False):
         """
         Calculate neighbours of genes.
-        :param genes: Data frame as in init, gene names (rows) should match the one in init
-        :param n_neighbours: Number of neighbours to obtain for each gene
-        :param inverse: Calculate most similar neighbours (False) or neighbours with inverse profile (True)
-        :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'
-        :param log: Should expression data be log2 transformed
-        :param description: If an error occurs in KNN index formation report this with error
-        :param return_neigh_dist: Instead of parsed dictionary return tuple with NN matrix and similarities matrix,
-        as returned by pynndescent (converted to similarities) but named with gene names  in data frame.
+        :param genes: Data frame as in class init, gene names (rows) should match the one in init.
+        :param n_neighbours: Number of neighbours to obtain for each gene. This will include self for non-inverse.
+        :param inverse: Calculate most similar neighbours (False) or neighbours with inverse profile (True).
+        :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'.
+        :param log: Should expression data be log2(data+pseudocount) transformed before scaling.
+        :param description: If an error occurs while making KNN index report this description with the error.
+        :param return_neigh_dist: Return tuple with nearest neighbour matrix and similarity matrix data frames,
+            as returned by pynndescent, but with similarity matrix converted to similarities and with added gene
+            names for the index.
         :param genes_query_data: Use this as query. If None use genes.
         :param remove_self: Used only if return_neigh_dist is true. Whether to remove sample from its closest
-        neighbours or not. If retunr_neigh_dist is False this is done automatically. This also removes last
-        column/neighbours is self is not present - should not be used with inverse.
-        :param metric: 'cosine' or Pearson 'correlation'
-        :return: Dict with gene names as tuple keys (smaller by alphabet is first tuple value) and
-            values representing cosine similarity. Or see return_neigh_dist
+            neighbours or not. If return_neigh_dist is False this is done automatically. This also removes the last
+            column of neighbours if self is not present - thus it should not be used with inverse,
+            as self will not be present.
+        :return: Dict with keys being gene pair names tuple (smaller name by alphabet is the first tuple value) and
+            values representing cosine similarity. Or see return_neigh_dist.
         """
         genes_index, genes_query = NeighbourCalculator.get_index_query(genes=genes, inverse=inverse, scale=scale,
                                                                        log=log,
                                                                        genes_query_data=genes_query_data)
-        # Can set speed-quality trade-off, default is ok
         try:
-            index = NNDescent(genes_index, metric=metric, n_jobs=4)
+            index = NNDescent(genes_index,  n_jobs=4)
         except ValueError:
             try:
-                index = NNDescent(genes_index, metric=metric, tree_init=False, n_jobs=4)
+                index = NNDescent(genes_index,  tree_init=False, n_jobs=4)
                 warnings.warn(
                     'Dataset ' + description + ' index computed without tree initialisation',
                     Warning)
@@ -178,12 +138,12 @@ class NeighbourCalculator:
     def get_index_query(cls, genes: pd.DataFrame, inverse: bool, scale: str = SCALING, log: bool = LOG,
                         genes_query_data: pd.DataFrame = None) -> tuple:
         """
-        Get gene data scaled to be index or query for neighbour search.
+        Get genes data scaled to be index or query for neighbour search.
         :param genes: Gene data for index and query.
-        :param inverse: Inverse query to compute neighbours with opposite profile. True if use inverse.
+        :param inverse: If True inverse query to compute neighbours with opposite profile.
         :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'.
-        :param log: Should expression data be log2 transformed.
-        :param genes_query_data: Genes data for query, if None uses genes
+        :param log: Should expression data be log2(data+pseudocount) transformed.
+        :param genes_query_data: Genes data for query, if None uses genes.
         :return: genes for index (1st element) and genes for query (2nd element)
         """
         if scale not in [cls.MINMAX, cls.MEANSTD, cls.NONE]:
@@ -247,17 +207,19 @@ class NeighbourCalculator:
     def parse_neighbours(neighbours: np.ndarray, distances: np.ndarray, genes_idx: pd.DataFrame,
                          genes_query: pd.DataFrame) -> dict:
         """
-        Transform lists of neighbours and distances into dictionary with neighbours as keys and values as similarities.
-        If pair of neighbours is given more than once it is overwritten the second time it is added to dictionary.
-        For cosine similarity the above should be always the same.
-        The neighbours (in form of index) are named based on gene data (index) stored in NeighbourCalculator instance.
+        Transform neighbours and distances data frames into dictionary with neighbours (gene pair names
+        sorted alphabetically) as keys and values being similarities.
+        If pair of neighbours is given more than once (e.g. twice) the added similarity is an average of
+        the already present and the new similarity.
+        The neighbours are named based on genes data (index) stored in NeighbourCalculator instance.
         :param neighbours: Array of shape: genes*neighbours, where for each gene there are specified neighbours
+            (as indices).
         :param distances: Array of shape: genes*neighbours, where for each gene there are specified distances
-            for each neighbour, as they are given above
-        :param genes_query: DataFrame used to name genes in neighbours & distanmces rows (querry),
-         gene names in rows.
-        :param genes_idx: DataFrame used to name genes in neighbours & distanmces table entries,
-         gene names in rows.
+            for each neighbour, in the same order as in neighbours DF.
+        :param genes_query: DataFrame used to name genes in neighbours & distances rows (the query of PyNNDescent),
+            gene names in rows.
+        :param genes_idx: DataFrame used to name genes in neighbours & distances table entries (the PyNNDescent index),
+            gene names in rows.
         :return: Dict with gene names as tuple keys (smaller by alphabet is first tuple value) and
             values representing similarity: 1-distance
         """
@@ -266,8 +228,8 @@ class NeighbourCalculator:
             for neighbour in range(distances.shape[1]):
                 distance = distances[gene, neighbour]
                 # Because of rounding the similarity may be slightly above one and distance slightly below 0
-                if distance < 0 or distance > 1:
-                    if round(distance, 4) != 0 or distance > 1:
+                if distance < 0 or distance > 2:
+                    if round(distance, 4) != 0 or distance > 2:
                         warnings.warn(
                             'Odd cosine distance at ' + str(gene) + ' ' + str(neighbour) + ' :' + str(distance),
                             Warning)
@@ -284,8 +246,8 @@ class NeighbourCalculator:
                         add_name1 = gene_name2
                         add_name2 = gene_name1
                     if (add_name1, add_name2) in parsed.keys():
-                        # Can do average directly as there will not be more than 2 pairs with same elements
-                        # (eg. both possible positions: a,b and b,a for index,query)
+                        # Can do averaging directly with existing value as there will not be more than 2 pairs
+                        # with the same genes (eg. both possible positions: a,b and b,a for index,query)
                         # Similarities may be different when inverse is used with minmax
                         parsed[(add_name1, add_name2)] = (parsed[(add_name1, add_name2)] + similarity) / 2
                     else:
@@ -325,9 +287,10 @@ class NeighbourCalculator:
     @staticmethod
     def remove_self_pynn_matrix(neighbours: pd.DataFrame, similarities: pd.DataFrame):
         """
-        Parse similarities and neighbours data frames. Remove entries for each gene that represent itself being
-        the closest neighbour. If row name not in neghours row removes last element from neighbours and similarities.
-        :param similarities: Similarities matrix from neighbours function (row names with genes)
+        Parse similarities and neighbours data frames. Remove entries of each gene that represent itself being
+        a close neighbour. If self is not in neghbours then it removes the last element from the neighbours and
+        similarities, so that all genes have same N of neighbours.
+        :param similarities: Similarities matrix from neighbours function (row names with gene names)
         :param neighbours: Neighbours matrix from neighbours function (row names and values named with genes)
         """
         similarities_parsed = pd.DataFrame(index=similarities.index, columns=similarities.columns[:-1])
@@ -356,7 +319,9 @@ class NeighbourCalculator:
 # **** Manage data (load data, specify saving path)
 # Path to expression data
 path_data = '/home/karin/Documents/timeTrajectories/data/RPKUM/combined/'
-path_results = '/home/karin/Documents/git/baylor_dicty_paper/try/'
+path_results = PATH_RESULTS+'regulons/'
+if not os.path.exists(path_results):
+    os.makedirs(path_results)
 
 # Load expression data
 genes = pd.read_csv(path_data + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
@@ -412,10 +377,6 @@ for batch in set(batches):
 
 # **************************
 # *** Combine close neighbour results across strains
-
-# Load by strain similarity thresholds
-threshold_data = load_pickle(path_results + 'strainThresholds_k2_m0s1log_highest' + str(1 - THRESHOLD_QUANTILE) +
-                             '.pkl')
 
 # Extract genes from strains and merge into a single matrix
 files = [f for f in glob.glob(path_results + 'neighbours_kN' + str(KNN) + '_mean0std1_log_' + "*.pkl")]
