@@ -7,6 +7,7 @@ library(extrafont)
 library(proxy)
 library(seriation)
 library(dendextend)
+library(purrr)
 
 # Import fonts
 font_import(prompt = FALSE)
@@ -53,7 +54,7 @@ phenotype_cols <- c('no image' = '#d9d9d9', 'no_agg' = '#ed1c24', 'stream' = '#9
 optically_order_genes <- function(genes, avg_expression) {
   if (length(genes) > 1) {
     expression <- t(avg_expression[avg_expression$Strain == 'AX4', genes])
-    distances <- dist(expression, method = "cosine")
+    distances <- dist(expression, method = "Euclidean")
     hc <- hclust(d = distances, method = "ward.D2")
     hc_ordered <- reorder(x = hc, dist = distances)
     genes <- as.dendrogram(hc_ordered) %>% labels
@@ -64,13 +65,63 @@ optically_order_genes <- function(genes, avg_expression) {
 # ********************
 # *** Regulons heatmap
 
-# *** Load data and helper functions
+# *** Rename regulons so that regulon with lower n umber will be plotted first.
+# Needs to be done only once as the regulons file is overwritten
+path_regulons<- 'Results/regulons/'
+# Expression patterns file: Expression pattern in AX4.
+# Genes in the first column (used as row names); a column Peak with peak time of expression in AX4 -
+# used for sorting the regulons.
+expression_patterns <- read.table(paste(path_avg, "gene_peaks_AX4.tsv", sep = ''),
+                                  header = TRUE, row.names = 1, sep = "\t")
 
-path_clusters <- 'Data/'
+#' Sort clusters based on median and mean pattern time (e.g. peak time in AX4)
+#' @param regulons Regulons dataframe
+#' @param expression_patterns Expression pattern data frame (described above)
+#' @param pattern_type Column from expression_pattern data frame (described above) used for sorting the regulons
+sort_clusters <- function(regulons, expression_patterns = expression_patterns, pattern_type = 'Peak') {
+  cluster_patterns_mean <- c()
+  cluster_patterns_median <- c()
+  clusters<- unique(regulons$Cluster)
+  # Extract median and mean pattern time for each regulon
+  for (cluster in clusters) {
+    genes <- as.character(regulons[regulons$Cluster == cluster, 'Gene'])
+    pattern_mean <- mean(expression_patterns[genes, pattern_type])
+    pattern_median <- median(expression_patterns[genes, pattern_type])
+    cluster_patterns_mean <- c(cluster_patterns_mean, pattern_mean)
+    cluster_patterns_median <- c(cluster_patterns_median, pattern_median)
+  }
+  # Sort by median and then mean
+  cluster_order <- data.frame('Cluster' = clusters, 'Pattern_mean' = cluster_patterns_mean, 'Pattern_median' = cluster_patterns_median)
+  cluster_order <- cluster_order[order(cluster_order$Pattern_median, cluster_order$Pattern_mean),]
+  return(cluster_order)
+}
+
+for(regulons_file in c("mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab",
+                       'mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersLouvain0.4minmaxNologPCA30kN30.tab')){
+  # Load regulons
+  # Regulon groups tab file: First column lists genes and
+  # a column named Cluster specifying cluster/regulon of each gene
+  regulons <- read.table(paste(path_data, regulons_file, sep = ''), header = TRUE, sep = "\t")
+  #Name the first column (should contain genes
+  colnames(regulons)[1] <- 'Gene'
+
+  # Rename the regulons in plotting order
+  cluster_order <- sort_clusters(regulons = regulons, expression_patterns = expression_patterns, pattern_type = 'Peak')
+  # Rename the regulons based on the new ordering and save the renamed regulons
+  cluster_map<-c(paste('C',c(1:nrow(cluster_order)),sep=''))
+  names(cluster_map)<-as.vector(cluster_order$Cluster)
+  remap_cluster<-function(x){return(cluster_map[[x]])}
+  regulons['Cluster']<-unlist(map(as.character(regulons$Cluster),remap_cluster))
+
+  # Save renamed regulons
+  write.table(regulons,paste(path_regulons,regulons_file,sep=''),row.names=FALSE, sep="\t")
+}
+
+# *** Load data and helper functions
 
 # Averaged expression tab file: Genes in columns (already scaled), averaged strain data in rows,
 # three additional comlumns: Time, Strain, and Group (meaning strain group)
-avg_expression <- read.table(paste(path_avg, "genes_averaged_orange_scale99percentileMax0.1.tsv", sep = ''),
+avg_expression <- read.table(paste(path_avg, "genes_averaged_scaled_percentile99_max0.1.tsv", sep = ''),
                              header = TRUE, row.names = 1, sep = "\t")
 
 # Phenotypes tab file: Short averaged sample names in rows (as in avg_expression) and columns with phenotypes.
@@ -178,40 +229,13 @@ make_annotation <- function(phenotypes_font = parent.frame()$phenotypes_font,
   return(ht_list)
 }
 
-# Expression patterns file: Expression pattern in AX4.
-# Genes in the first column (used as row names); a column Peak with peak time of expression in AX4 -
-# used for sorting the regulons.
-expression_patterns <- read.table(paste(path_avg, "gene_peaks_AX4.tsv", sep = ''),
-                                  header = TRUE, row.names = 1, sep = "\t")
-
 # Regulons reference (AX4) groups tab file (used for side annotation): First column lists genes and
 # a column named Cluster specifying cluster/regulon of each gene
-regulons2 <- read.table(paste(path_data, "clusters/mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab", sep = ''),
-                        header = TRUE, sep = "\t")
+regulons2 <- read.table(paste(path_regulons,
+                              "mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab",
+                              sep = ''),header = TRUE, sep = "\t")
 rownames(regulons2) <- regulons2[, 1]
 regulons2 <- regulons2[, 'Cluster', drop = F]
-
-#' Sort clusters based on median and mean pattern time (e.g. peak time in AX4)
-#' @param regulons Regulons dataframe
-#' @param expression_patterns Expression pattern data frame (described above)
-#' @param pattern_type Column from expression_pattern data frame (described above) used for sorting the regulons
-sort_clusters <- function(regulons, expression_patterns = expression_patterns, pattern_type = 'Peak') {
-  cluster_patterns_mean <- c()
-  cluster_patterns_median <- c()
-
-  # Extract median and mean pattern time for each regulon
-  for (cluster in clusters) {
-    genes <- as.character(regulons[regulons$Cluster == cluster, 'Gene'])
-    pattern_mean <- mean(expression_patterns[genes, pattern_type])
-    pattern_median <- median(expression_patterns[genes, pattern_type])
-    cluster_patterns_mean <- c(cluster_patterns_mean, pattern_mean)
-    cluster_patterns_median <- c(cluster_patterns_median, pattern_median)
-  }
-  # Sort by median and then mean
-  cluster_order <- data.frame('Cluster' = clusters, 'Pattern_mean' = cluster_patterns_mean, 'Pattern_median' = cluster_patterns_median)
-  cluster_order <- cluster_order[order(cluster_order$Pattern_median, cluster_order$Pattern_mean),]
-  return(cluster_order)
-}
 
 # Sort reference (AX4 based) regulons
 regulons2_temp <- data.frame(regulons2)
@@ -226,12 +250,7 @@ for (cluster in cluster_order2$Cluster) {
   AX4_ordered <- append(AX4_ordered, genes)
 }
 
-# Expression range for legend
-expressions <- within(avg_expression, rm('Time', 'Strain', 'Group'))
-min_expression <- min(expressions[, regulons$Gene])
-max_expression <- max(expressions[, regulons$Gene])
-
-# reference (AX$) regulon colours: 13 distinct colours ordered by rainbow
+# reference (AX4) regulon colours: 13 distinct colours ordered by rainbow
 colours_regulons2 <- c('#800000', '#e6194b', '#f58231', '#9a6324', '#ffe119', '#9dd100', '#3cb44b', '#aaffc3',
                        '#46f0f0', '#2e97ff', '#000075', '#911eb4', '#f032e6')
 # refernce (AX4) regulons colour map
@@ -253,7 +272,7 @@ if (regulons_type == 'AX4') {
 }
 # Regulon groups tab file: First column lists genes and
 # a column named Cluster specifying cluster/regulon of each gene
-regulons <- read.table(paste(path_data, regulons_file, sep = ''), header = TRUE, sep = "\t")
+regulons <- read.table(paste(path_regulons, regulons_file, sep = ''), header = TRUE, sep = "\t")
 #Name the first column (should contain genes
 colnames(regulons)[1] <- 'Gene'
 
@@ -261,6 +280,11 @@ colnames(regulons)[1] <- 'Gene'
 clusters <- unique(regulons$Cluster)
 vals <- as.numeric(gsub("C", "", clusters))
 clusters <- clusters[order(vals)]
+
+# Expression range for legend
+expressions <- within(avg_expression, rm('Time', 'Strain', 'Group'))
+min_expression <- min(expressions[, regulons$Gene])
+max_expression <- max(expressions[, regulons$Gene])
 
 # Make heatmap annotations
 ht_list <- make_annotation()
