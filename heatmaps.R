@@ -296,8 +296,6 @@ cluster_order <- sort_clusters(regulons = regulons, expression_patterns = expres
 # Some annotations are added only for the first regulon heatmap (e.g. legend, etc.)
 first <- TRUE
 for (cluster in cluster_order$Cluster) {
-  print(cluster)
-
   genes <- as.character(regulons[regulons$Cluster == cluster, 'Gene'])
   genes <- as.character(genes[order(match(genes, AX4_ordered))])
   regulons2_annotation <- rowAnnotation(AX4_clusters = regulons2[genes,], col = list(AX4_clusters = colours_regulons2_map),
@@ -333,10 +331,10 @@ graphics.off()
 # ****** Milestones heatmap
 
 # *** Load data and helper functions
-path_milestones<-'Results/milestones'
+path_milestones<-'Results/milestones/'
 
 avg_expression_stages <- read.table(
-  paste0(path_avg, "genes_averaged_orange_mainStage_scale99percentileMax0.1.tsv"),
+  paste0(path_avg, "genes_averaged_mainStage_scale_percentile99_max0.1.tsv"),
   header = TRUE, row.names = 1, sep = "\t")
 
 strain_gap <- 1
@@ -415,9 +413,9 @@ make_anno_mainstage <- function(legend_height = parent.frame()$legend_height,
 }
 
 # Milestone data
-data_impulse <- read.table(paste(path_milestones, 'DEacrossStages_summary_mainstage_AX4_0.001.tsv', sep = ''),
+data_impulse <- read.table(paste(path_milestones, 'DEacrossMainStages_AX4_summary_fdr0.001.tsv', sep = ''),
                            header = TRUE, sep = '\t', row.names = 1)
-data_deseq <- read.table(paste(path_milestones, 'AX4/', 'combined.tsv', sep = ''),
+data_deseq <- read.table(paste(path_milestones, 'DE_combined.tsv', sep = ''),
                          header = TRUE, sep = '\t', row.names = 1)
 data <- merge(data_deseq, data_impulse, all = TRUE, by = "row.names")
 row.names(data) <- data$Row.names
