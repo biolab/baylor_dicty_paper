@@ -15,12 +15,13 @@ loadfonts(device = "pdf")
 # ************
 # ** Load data shared across heatmaps
 
-path_strain_order <- '/home/karin/Documents/timeTrajectories/data/'
-path_phenotypes <- '/home/karin/Documents/timeTrajectories/data/stages/'
-path_save <- '/home/karin/Documents/git/baylor_dicty_paper/try/'
+path_data<- 'Data/'
+path_save <- 'Results/heatmaps/'
+path_avg <- 'Results/averaged/'
+if(!dir.exists(path_save)) dir.create(path_save,recursive=TRUE)
 
 # Strain order - single column with ordered strain names
-strain_order <- as.vector(read.table(paste(path_strain_order, "strain_order.tsv", sep = ''))[, 1])
+strain_order <- as.vector(read.table(paste(path_data, "strain_order.tsv", sep = ''))[, 1])
 
 # Some plotting parameters
 phenotypes_font <- 10
@@ -64,17 +65,16 @@ optically_order_genes <- function(genes, avg_expression) {
 
 # *** Load data and helper functions
 
-path_clusters <- '/home/karin/Documents/timeTrajectories/data/regulons/by_strain/kN300_mean0std1_log/'
-path_expression_regulons <- '/home/karin/Documents/timeTrajectories/data/regulons/'
+path_clusters <- 'Data/'
 
 # Averaged expression tab file: Genes in columns (already scaled), averaged strain data in rows,
 # three additional comlumns: Time, Strain, and Group (meaning strain group)
-avg_expression <- read.table(paste(path_expression_regulons, "genes_averaged_orange_scale99percentileMax0.1.tsv", sep = ''),
+avg_expression <- read.table(paste(path_avg, "genes_averaged_orange_scale99percentileMax0.1.tsv", sep = ''),
                              header = TRUE, row.names = 1, sep = "\t")
 
 # Phenotypes tab file: Short averaged sample names in rows (as in avg_expression) and columns with phenotypes.
 # Phenotypes should have values: yes, no, no image
-avg_phenotype <- read.table(paste(path_phenotypes, "averageStages.tsv", sep = ''),
+avg_phenotype <- read.table(paste(path_avg, "averageStages.tsv", sep = ''),
                             header = TRUE, row.names = 1, sep = "\t", stringsAsFactors = FALSE)
 # Modify avg_phenotypes data so that each stage can be coloured differently - set yes to the stage it represents
 avg_phenotype[avg_phenotype == 'no'] = NA
@@ -180,12 +180,12 @@ make_annotation <- function(phenotypes_font = parent.frame()$phenotypes_font,
 # Expression patterns file: Expression pattern in AX4.
 # Genes in the first column (used as row names); a column Peak with peak time of expression in AX4 -
 # used for sorting the regulons.
-expression_patterns <- read.table(paste(path_expression_regulons, "gene_peaks_AX4.tsv", sep = ''),
+expression_patterns <- read.table(paste(path_avg, "gene_peaks_AX4.tsv", sep = ''),
                                   header = TRUE, row.names = 1, sep = "\t")
 
 # Regulons reference (AX4) groups tab file (used for side annotation): First column lists genes and
 # a column named Cluster specifying cluster/regulon of each gene
-regulons2 <- read.table(paste(path_clusters, "clusters/mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab", sep = ''),
+regulons2 <- read.table(paste(path_data, "clusters/mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab", sep = ''),
                         header = TRUE, sep = "\t")
 rownames(regulons2) <- regulons2[, 1]
 regulons2 <- regulons2[, 'Cluster', drop = F]
@@ -252,7 +252,7 @@ if (regulons_type == 'AX4') {
 }
 # Regulon groups tab file: First column lists genes and
 # a column named Cluster specifying cluster/regulon of each gene
-regulons <- read.table(paste(path_clusters, regulons_file, sep = ''), header = TRUE, sep = "\t")
+regulons <- read.table(paste(path_data, regulons_file, sep = ''), header = TRUE, sep = "\t")
 #Name the first column (should contain genes
 colnames(regulons)[1] <- 'Gene'
 
@@ -308,11 +308,10 @@ graphics.off()
 # ****** Milestones heatmap
 
 # *** Load data and helper functions
-pathImpulse <- '/home/karin/Documents/timeTrajectories/data/stages/DE_across_stages/'
-pathDeseq <- '/home/karin/Documents/timeTrajectories/data/deTime/neighbouring/'
+path_milestones<-'Results/milestones'
 
 avg_expression_stages <- read.table(
-  paste0(path_phenotypes, "genes_averaged_orange_mainStage_scale99percentileMax0.1.tsv"),
+  paste0(path_avg, "genes_averaged_orange_mainStage_scale99percentileMax0.1.tsv"),
   header = TRUE, row.names = 1, sep = "\t")
 
 strain_gap <- 1
@@ -391,9 +390,9 @@ make_anno_mainstage <- function(legend_height = parent.frame()$legend_height,
 }
 
 # Milestone data
-data_impulse <- read.table(paste(pathImpulse, 'DEacrossStages_summary_mainstage_AX4_0.001.tsv', sep = ''),
+data_impulse <- read.table(paste(path_milestones, 'DEacrossStages_summary_mainstage_AX4_0.001.tsv', sep = ''),
                            header = TRUE, sep = '\t', row.names = 1)
-data_deseq <- read.table(paste(pathDeseq, 'AX4/', 'combined.tsv', sep = ''),
+data_deseq <- read.table(paste(path_milestones, 'AX4/', 'combined.tsv', sep = ''),
                          header = TRUE, sep = '\t', row.names = 1)
 data <- merge(data_deseq, data_impulse, all = TRUE, by = "row.names")
 row.names(data) <- data$Row.names

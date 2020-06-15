@@ -1,9 +1,14 @@
+import os
 import pandas as pd
 import numpy as np
 
 from statsmodels.stats.multitest import multipletests
 
-path_save = '/home/karin/Documents/git/baylor_dicty_paper/try/'
+from helper import PATH_RESULTS
+
+path_save = PATH_RESULTS+'milestones/'
+if not os.path.exists(path_save):
+    os.makedirs(path_save)
 # ************************
 # **** Combine all DE (DESeq2) results between neighbouring stages into a single table
 

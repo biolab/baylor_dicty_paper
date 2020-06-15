@@ -14,7 +14,7 @@ import os
 
 import pygam
 
-from helper import save_pickle, GROUPS, STAGES, PATH_RESULTS
+from helper import save_pickle, GROUPS, STAGES, PATH_RESULTS, PATH_DATA
 
 
 # ***********************
@@ -361,10 +361,9 @@ def adjust_axes_lim(ax: plt.Axes, min_x_thresh: float, max_x_thresh: float, min_
 path_save = PATH_RESULTS + 'PC1vsTime/'
 if not os.path.exists(path_save):
     os.makedirs(path_save)
-path_data = '/home/karin/Documents/timeTrajectories/data/RPKUM/combined/'
 
-genes = pd.read_csv(path_data + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
-conditions = pd.read_csv(path_data + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
+genes = pd.read_csv(PATH_DATA+ 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
+conditions = pd.read_csv(PATH_DATA + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
 
 font = 'Arial'
 matplotlib.rcParams.update({'font.family': font})

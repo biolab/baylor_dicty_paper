@@ -2,18 +2,21 @@ import warnings
 import glob
 import os
 
+import multiprocessing
 import numpy as np
 import pandas as pd
 
 from pynndescent import NNDescent
 import sklearn.preprocessing as pp
 
-from helper import  merge_genes_conditions, split_data, save_pickle, load_pickle, PATH_RESULTS
+from helper import merge_genes_conditions, split_data, save_pickle, load_pickle, PATH_RESULTS, PATH_DATA
 
 # ***************
 # *** Helper functions
 SCALING = 'mean0std1'
 LOG = True
+
+THREADS = multiprocessing.cpu_count() - 1
 
 
 class NeighbourCalculator:
@@ -107,10 +110,10 @@ class NeighbourCalculator:
                                                                        log=log,
                                                                        genes_query_data=genes_query_data)
         try:
-            index = NNDescent(genes_index,  n_jobs=4)
+            index = NNDescent(genes_index, n_jobs=THREADS)
         except ValueError:
             try:
-                index = NNDescent(genes_index,  tree_init=False, n_jobs=4)
+                index = NNDescent(genes_index, tree_init=False, n_jobs=THREADS)
                 warnings.warn(
                     'Dataset ' + description + ' index computed without tree initialisation',
                     Warning)
@@ -318,14 +321,13 @@ class NeighbourCalculator:
 # *******************
 # **** Manage data (load data, specify saving path)
 # Path to expression data
-path_data = '/home/karin/Documents/timeTrajectories/data/RPKUM/combined/'
-path_results = PATH_RESULTS+'regulons/'
+path_results = PATH_RESULTS + 'regulons/'
 if not os.path.exists(path_results):
     os.makedirs(path_results)
 
 # Load expression data
-genes = pd.read_csv(path_data + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
-conditions = pd.read_csv(path_data + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
+genes = pd.read_csv(PATH_DATA + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
+conditions = pd.read_csv(PATH_DATA + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
 
 # *************************
 # *** Similarity thresholds for each replicate
@@ -355,9 +357,9 @@ for strain in strains:
     sims = sims_dict[strain][0]
     # Thresholds were rounded for display (not shown) and subsequent analysis
     threshold = np.round(np.quantile(sims, THRESHOLD_QUANTILE), 3)
-    threshold_data[strain]= threshold
+    threshold_data[strain] = threshold
 
-save_pickle(path_results + 'strainThresholds_k2_m0s1log_highest' + str(1 - THRESHOLD_QUANTILE) + '.pkl',threshold_data)
+save_pickle(path_results + 'strainThresholds_k2_m0s1log_highest' + str(1 - THRESHOLD_QUANTILE) + '.pkl', threshold_data)
 
 # ***********************
 # *** Find close gene neighbours in each strain
@@ -387,7 +389,7 @@ for f in files:
     strain = f.split('_')[-1].replace('.pkl', '')
     result = load_pickle(f)
     similarity_threshold = threshold_data[strain]
-    print('Adding data of',strain, ' using similarity threshold', similarity_threshold)
+    print('Adding data of', strain, ' using similarity threshold', similarity_threshold)
     for pair, similarity in result.items():
         # If similarity of a gene pair is at least equal to the similarity threshold then count the two genes
         # as co-expressed in a strain

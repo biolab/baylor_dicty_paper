@@ -1,21 +1,21 @@
+import os
 import pandas as pd
 import numpy as np
 
-from helper import merge_genes_conditions, split_data,GROUPS, STAGES
+from helper import merge_genes_conditions, split_data,GROUPS, STAGES,PATH_RESULTS, PATH_DATA
 
 # *******************
 # **** Manage data (load data, specify saving path)
 # Path to data
-path_data = '/home/karin/Documents/timeTrajectories/data/RPKUM/combined/'
-path_conditions_originalstage='/home/karin/Documents/timeTrajectories/data/stages/'
-path_strain_order = '/home/karin/Documents/timeTrajectories/data/'
-path_results = '/home/karin/Documents/git/baylor_dicty_paper/try/'
+path_results = PATH_RESULTS+'averaged/'
+if not os.path.exists(path_results):
+    os.makedirs(path_results)
 
 # Load expression data
-genes = pd.read_csv(path_data + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
-conditions = pd.read_csv(path_data + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
+genes = pd.read_csv(PATH_DATA+ 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
+conditions = pd.read_csv(PATH_DATA + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
 
-STRAIN_ORDER = pd.read_table(path_strain_order + 'strain_order.tsv', header=None).values.ravel()
+STRAIN_ORDER = pd.read_table(PATH_DATA + 'strain_order.tsv', header=None).values.ravel()
 # *****************
 # *** Expression averaged across replicates of strains by timepoint
 
@@ -106,7 +106,7 @@ def avgsample_name(group:tuple) -> str:
 
 
 # TOOD rename this file
-conditions_originalstage = pd.read_csv(path_data + 'conditions_noImage_mergedGenes.tsv', sep='\t',
+conditions_originalstage = pd.read_csv(PATH_DATA + 'conditions_noninfered_mergedGenes.tsv', sep='\t',
                                             index_col=None).sort_values(['Strain', 'Time'])
 # Make averaged stages data, averaging samples by strain and time
 averaged_stages = pd.DataFrame(columns=STAGES)

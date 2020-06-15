@@ -3,6 +3,7 @@ library('dplyr')
 library("BiocParallel")
 library("ImpulseDE2")
 library('plyr')
+library(parallel)
 
 # ****************************
 # *** Helper functions for DE analysis
@@ -95,16 +96,15 @@ runDeSeq2 <- function(conditions, genes, case, control, design, main_lvl, path =
 # *** Load data
 
 # Threads
-threads <- 4
-register(MulticoreParam(threads))
+THREADS <- detectCores()-1
+register(MulticoreParam(THREADS))
 
-#TODO make data paths the same
-path_data1 <- '/home/karin/Documents/timeTrajectories/data/countsRaw/combined/'
-path_data2 <- '/home/karin/Documents/timeTrajectories/data/RPKUM/combined/'
-path_save <- '/home/karin/Documents/git/baylor_dicty_paper/try/'
+path_data <- 'Data/'
+path_save <- 'Results/milestones/'
+if(!dir.exists(path_save)) dir.create(path_save,recursive=TRUE)
 
-genes <- read.table(paste(path_data1, "mergedGenes_counts.tsv", sep = ''), header = TRUE, row.names = 1, sep = "\t")
-conditions <- read.table(paste(path_data2, "conditions_mergedGenes.tsv", sep = ''), header = TRUE,
+genes <- read.table(paste(path_data, "mergedGenes_counts.tsv", sep = ''), header = TRUE, row.names = 1, sep = "\t")
+conditions <- read.table(paste(path_data, "conditions_mergedGenes.tsv", sep = ''), header = TRUE,
                          row.names = 'Measurment', sep = "\t")
 # Gene data frame column names (sample names) were modified during import, so chnage the metadata accordingly
 rownames(conditions) <- make.names(rownames(conditions))
@@ -155,7 +155,7 @@ print(paste('N samples:', nrow(Y)))
 
 # Run ImpulseDE2
 objectImpulseDE2 <- runImpulseDE2(matCountData = as.matrix(X), dfAnnotation = Y, boolCaseCtrl = FALSE,
-                                  vecConfounders = NULL, boolIdentifyTransients = TRUE, scaNProc = threads)
+                                  vecConfounders = NULL, boolIdentifyTransients = TRUE, scaNProc = THREADS)
 
 saveRDS(object = objectImpulseDE2, file = paste(path_save, 'DEacrossMainStages_AX4.rds', sep = ''))
 write.table(STAGES_X, file = paste(path_save, 'DEacrossMainStages_AX4_stageOrder.tsv', sep = ''), sep = '\t', row.names = FALSE)
