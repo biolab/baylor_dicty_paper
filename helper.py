@@ -1,8 +1,8 @@
 import pandas as pd
 import pickle
 
-PATH_RESULTS='Results/'
-PATH_DATA='Data/'
+PATH_RESULTS = 'Results/'
+PATH_DATA = 'Data/'
 
 GROUPS = {'amiB': 'agg-', 'mybB': 'agg-', 'acaA': 'agg-', 'gtaC': 'agg-',
           'gbfA': 'lag_dis', 'tgrC1': 'lag_dis', 'tgrB1': 'tag_dis', 'tgrB1C1': 'tag_dis',
@@ -11,7 +11,8 @@ GROUPS = {'amiB': 'agg-', 'mybB': 'agg-', 'acaA': 'agg-', 'gtaC': 'agg-',
           'AX4': 'WT', 'MybBGFP': 'WT',
           'acaAPkaCoe': 'sFB', 'ac3PkaCoe': 'sFB',
           'pkaR': 'prec', 'PkaCoe': 'prec'}
-STAGES = ['no_agg', 'stream', 'lag', 'tag', 'tip', 'slug', 'mhat', 'cul', 'FB','yem']
+STAGES = ['no_agg', 'stream', 'lag', 'tag', 'tip', 'slug', 'mhat', 'cul', 'FB', 'yem']
+
 
 def save_pickle(file: str, object):
     """

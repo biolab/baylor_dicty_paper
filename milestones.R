@@ -1,10 +1,11 @@
+print('Preparing milestones data.')
+
 library("DESeq2")
 library('dplyr')
 library("BiocParallel")
 library("ImpulseDE2")
 library('plyr')
 library(parallel)
-
 # ****************************
 # *** Helper functions for DE analysis
 
@@ -96,12 +97,13 @@ runDeSeq2 <- function(conditions, genes, case, control, design, main_lvl, path =
 # *** Load data
 
 # Threads
-THREADS <- detectCores()-1
+THREADS <- detectCores() - 1
+if(THREADS>30) THREADS<-30
 register(MulticoreParam(THREADS))
 
 path_data <- 'Data/'
 path_save <- 'Results/milestones/'
-if(!dir.exists(path_save)) dir.create(path_save,recursive=TRUE)
+if (!dir.exists(path_save)) dir.create(path_save, recursive = TRUE)
 
 genes <- read.table(paste(path_data, "mergedGenes_counts.tsv", sep = ''), header = TRUE, row.names = 1, sep = "\t")
 conditions <- read.table(paste(path_data, "conditions_mergedGenes.tsv", sep = ''), header = TRUE,
@@ -191,7 +193,7 @@ print(paste('N genes DE across stages:', nrow(result)))
 parsed <- data.frame()
 for (gene in rownames(result)) {
   parsed[gene, c('impulse_padj', 'impulseTOsigmoid_padj', 'sigmoid_padj')] <- result[gene,
-                                          c('padj', 'impulseTOsigmoid_padj', 'sigmoidTOconst_padj')]
+                                                                                     c('padj', 'impulseTOsigmoid_padj', 'sigmoidTOconst_padj')]
   type <- ''
   # Was gene determined to be transient or monotonous
   if (result[gene, 'isTransient']) type <- 'transient'
@@ -225,7 +227,7 @@ for (gene in rownames(result)) {
     assignment <- NA
     if (min_x < t & t < max_x) {
       assignment <- 'impulse'
-    # Assumes that stages are integers
+      # Assumes that stages are integers
     } else if (min_x >= t) {
       t <- min_x + 0.1
       assignment <- 'impulse_manual_border'
@@ -248,7 +250,7 @@ for (gene in rownames(result)) {
       }
     }
 
-  # Parse genes transiently DE across stages
+    # Parse genes transiently DE across stages
   } else if (type == 'transient') {
     model_data <- as.list(model[gene][[1]]$lsImpulseFit$vecImpulseParam)
     t1 <- model_data$t1
@@ -266,7 +268,11 @@ for (gene in rownames(result)) {
     # Type=transient_monotonous.
     assignment <- NA
     # t1,t2 are in the right orientation and in the right range for transitions to be determined directly.
-    if (min_x < t1 & t1 < max_x & min_x < t2 & t2 < max_x & floor(t1) != floor(t2)) {
+    if (min_x < t1 &
+      t1 < max_x &
+      min_x < t2 &
+      t2 < max_x &
+      floor(t1) != floor(t2)) {
       assignment <- 'impulse'
     }
     # Check if t1,t2 are between the same stages so that reasigning border does not cause this situation
@@ -333,7 +339,7 @@ for (gene in rownames(result)) {
             parsed[gene, neighbouring] <- 0
           }
         }
-      # Model was parsed as having two transitions
+        # Model was parsed as having two transitions
       } else {
         phenotypes1 <- as.vector(stages_x[stages_x$X < t1 | stages_x$X > t2, 'Phenotype'])
         phenotypes2 <- as.vector(stages_x[stages_x$X > t1 & stages_x$X < t2, 'Phenotype'])
@@ -358,7 +364,7 @@ for (gene in rownames(result)) {
 
 # Report on transition parsing
 parsed_nonna <- parsed[!is.na(parsed$Assignment),]
-print(paste('Assignment: impulse:',sum(parsed_nonna$Assignment == 'impulse'),
+print(paste('Assignment: impulse:', sum(parsed_nonna$Assignment == 'impulse'),
             'manual border:', sum(parsed_nonna$Assignment == 'impulse_manual_border'),
             'manual peak:', sum(parsed_nonna$Assignment == 'impulse_manual_peak'),
             'manual swapped:', sum(parsed_nonna$Assignment == 'impulse_manual_swapped'),

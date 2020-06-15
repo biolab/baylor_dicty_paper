@@ -1,3 +1,5 @@
+print('Preparing regulons data.')
+
 import warnings
 import glob
 import os
@@ -17,6 +19,8 @@ SCALING = 'mean0std1'
 LOG = True
 
 THREADS = multiprocessing.cpu_count() - 1
+if THREADS > 30:
+    THREADS = 30
 
 
 class NeighbourCalculator:
@@ -52,8 +56,8 @@ class NeighbourCalculator:
     def neighbours(self, n_neighbours: int, inverse: bool, scale: str = SCALING, log: bool = LOG,
                    return_neigh_dist: bool = False, genes_query_names: list = None, remove_self: bool = False):
         """
-        Calculates neighbours of genes based on expression profile across samples (columns). Wrapper for
-        calculate_neighbours.
+        Calculates neighbours of genes based on expression profile across samples (columns) based on cosine distances.
+        Wrapper for calculate_neighbours.
         :param n_neighbours: Number of neighbours to obtain for each gene. This will include self for non-inverse.
         :param inverse: Calculate most similar neighbours (False) or neighbours with inverse profile (True).
         :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'.
@@ -80,23 +84,23 @@ class NeighbourCalculator:
             genes_query = None
         return NeighbourCalculator.calculate_neighbours(genes=genes, n_neighbours=n_neighbours, inverse=inverse,
                                                         scale=scale,
-                                                        log=log, return_neigh_dist=return_neigh_dist,
+                                                        log=log, return_neigh_sim=return_neigh_dist,
                                                         genes_query_data=genes_query, remove_self=remove_self)
 
     @staticmethod
     def calculate_neighbours(genes, n_neighbours: int, inverse: bool, scale: str, log: bool,
-                             description: str = '', return_neigh_dist: bool = False,
+                             description: str = '', return_neigh_sim: bool = False,
                              genes_query_data: pd.DataFrame = None, remove_self: bool = False):
         """
-        Calculate neighbours of genes.
+        Calculate neighbours of genes based on cosine distance.
         :param genes: Data frame as in class init, gene names (rows) should match the one in init.
         :param n_neighbours: Number of neighbours to obtain for each gene. This will include self for non-inverse.
         :param inverse: Calculate most similar neighbours (False) or neighbours with inverse profile (True).
         :param scale: Scale expression by gene with 'minmax' (min=0, max=1) or 'mean0std1' (mean=0, std=1) or 'none'.
         :param log: Should expression data be log2(data+pseudocount) transformed before scaling.
         :param description: If an error occurs while making KNN index report this description with the error.
-        :param return_neigh_dist: Return tuple with nearest neighbour matrix and similarity matrix data frames,
-            as returned by pynndescent, but with similarity matrix converted to similarities and with added gene
+        :param return_neigh_sim: Return tuple with nearest neighbour matrix and similarity matrix data frames,
+            as returned by pynndescent, but with distance matrix converted to similarities and with added gene
             names for the index.
         :param genes_query_data: Use this as query. If None use genes.
         :param remove_self: Used only if return_neigh_dist is true. Whether to remove sample from its closest
@@ -110,7 +114,7 @@ class NeighbourCalculator:
                                                                        log=log,
                                                                        genes_query_data=genes_query_data)
         try:
-            index = NNDescent(genes_index, n_jobs=THREADS)
+            index = NNDescent(genes_index, n_jobs=THREADS, metric='cosine')
         except ValueError:
             try:
                 index = NNDescent(genes_index, tree_init=False, n_jobs=THREADS)
@@ -123,7 +127,7 @@ class NeighbourCalculator:
 
         if genes_query_data is None:
             genes_query_data = genes
-        if return_neigh_dist:
+        if return_neigh_sim:
             neighbours = NeighbourCalculator.parse_neighbours_matrix(neighbours=neighbours,
                                                                      genes_query=genes_query_data,
                                                                      genes_idx=genes)
@@ -230,13 +234,6 @@ class NeighbourCalculator:
         for gene in range(distances.shape[0]):
             for neighbour in range(distances.shape[1]):
                 distance = distances[gene, neighbour]
-                # Because of rounding the similarity may be slightly above one and distance slightly below 0
-                if distance < 0 or distance > 2:
-                    if round(distance, 4) != 0 or distance > 2:
-                        warnings.warn(
-                            'Odd cosine distance at ' + str(gene) + ' ' + str(neighbour) + ' :' + str(distance),
-                            Warning)
-                    distance = 0
                 similarity = NeighbourCalculator.cosine_dist_to_sim(distance)
                 gene2 = neighbours[gene, neighbour]
                 gene_name1 = genes_query.index[gene]
@@ -282,9 +279,6 @@ class NeighbourCalculator:
         Transform cosine distances to similarities
         :param distances: pynndescent cosine distance matrix
         """
-        if (np.around(distances, 4).any() < 0):
-            warnings.warn(
-                'Odd cosine distance in the matrix', Warning)
         return NeighbourCalculator.cosine_dist_to_sim(distances)
 
     @staticmethod
@@ -313,8 +307,32 @@ class NeighbourCalculator:
     @staticmethod
     def cosine_dist_to_sim(dist):
         """
-        Works on cosine and Pearson correlation distances
+        Works on cosine and Pearson correlation distances.
+        If dist is below 0 or above 2 it will be set to 0 or 2, respectively. An exception is raised if the
+        number is  different from 0 or 2 after rounding to 5 decimal places.
+        :param dist: Number or np.ndaray
         """
+        # Some distances are slightly below 0 or above 2 due to numerical precision - set them to 0 or 2, respectively.
+        if isinstance(dist, float):
+            if dist < 0:
+                if round(dist, 5) < 0:
+                    raise ValueError('Odd cosine distance (below 0), will be set to 0.')
+                dist = 0
+            elif dist > 2:
+                if round(dist, 5) > 2:
+                    raise ValueError('Odd cosine distance (above 2), will be set to 2.')
+                dist = 2
+        elif isinstance(dist, np.ndarray):
+            if dist.any() < 0:
+                if np.around(dist, 5).any() < 0:
+                    raise ValueError('Odd cosine distance (below 0), will be set to 0.')
+                dist[dist < 0] = 0
+            elif dist.any() > 2:
+                if np.around(dist, 5).any() > 2:
+                    raise ValueError('Odd cosine distance (above 2), will be set to 2.')
+                dist[dist > 2] = 2
+        else:
+            raise ValueError('The parameter dist must be float or np.ndarray.')
         return 1 - dist
 
 
@@ -368,6 +386,7 @@ save_pickle(path_results + 'strainThresholds_k2_m0s1log_highest' + str(1 - THRES
 batches = list(conditions['Strain'])
 batches = np.array(batches)
 
+# Number of neighbours to calculate for each gene.
 KNN = 300
 # Calculate neighbours
 for batch in set(batches):

@@ -1,3 +1,5 @@
+print('Preparing PC1 vs time plots.')
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,7 +17,6 @@ import os
 import pygam
 
 from helper import save_pickle, GROUPS, STAGES, PATH_RESULTS, PATH_DATA
-
 
 # ***********************
 # **** Helper functions
@@ -362,7 +363,7 @@ path_save = PATH_RESULTS + 'PC1vsTime/'
 if not os.path.exists(path_save):
     os.makedirs(path_save)
 
-genes = pd.read_csv(PATH_DATA+ 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
+genes = pd.read_csv(PATH_DATA + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
 conditions = pd.read_csv(PATH_DATA + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
 
 font = 'Arial'
@@ -522,7 +523,7 @@ for strain in conditions['Strain'].unique():
     rep_colours = dict(zip(replicates_unique, cmap))
     ax.scatter(data_transformed['x'], data_transformed['y'], c=[rep_colours[rep] for rep in replicates], alpha=0.7)
     ax.set_title(strain, fontdict={'fontsize': 13, 'fontfamily': font})
-    adjust_axes_lim(ax=ax,min_x_thresh=MIN_X,max_x_thresh=MAX_X,min_y_thresh=MIN_Y,max_y_thresh=MAX_Y)
+    adjust_axes_lim(ax=ax, min_x_thresh=MIN_X, max_x_thresh=MAX_X, min_y_thresh=MIN_Y, max_y_thresh=MAX_Y)
 
     # Put x axis tickmarks at sample times
     sampling_times = [time for time in data_transformed['x'].unique() if time % 4 == 0]
@@ -558,7 +559,7 @@ for strain in conditions['Strain'].unique():
     ax.spines['top'].set_visible(False)
     ax.set_xlabel('Time')
     ax.set_ylabel('PC1')
-    adjust_axes_lim(ax=ax,min_x_thresh=MIN_X,max_x_thresh=MAX_X,min_y_thresh=MIN_Y,max_y_thresh=MAX_Y)
+    adjust_axes_lim(ax=ax, min_x_thresh=MIN_X, max_x_thresh=MAX_X, min_y_thresh=MIN_Y, max_y_thresh=MAX_Y)
     fig.suptitle(strain, fontsize=15, fontfamily=font)
 
     # Put x axis tickmarks at sample times
@@ -596,7 +597,7 @@ ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
 ax.set_xlabel('Time')
 ax.set_ylabel('PC1')
-adjust_axes_lim(ax=ax,min_x_thresh=MIN_X,max_x_thresh=MAX_X,min_y_thresh=MIN_Y,max_y_thresh=MAX_Y)
+adjust_axes_lim(ax=ax, min_x_thresh=MIN_X, max_x_thresh=MAX_X, min_y_thresh=MIN_Y, max_y_thresh=MAX_Y)
 fig.suptitle("GAM fits to PC1 vs time of all strains",
              fontdict={'fontsize': 13, 'fontfamily': font})
 # Put x axis tickmarks at sample times
@@ -621,7 +622,7 @@ ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
 ax.set_xlabel('Time')
 ax.set_ylabel('PC1')
-adjust_axes_lim(ax=ax,min_x_thresh=MIN_X,max_x_thresh=MAX_X,min_y_thresh=MIN_Y,max_y_thresh=MAX_Y)
+adjust_axes_lim(ax=ax, min_x_thresh=MIN_X, max_x_thresh=MAX_X, min_y_thresh=MIN_Y, max_y_thresh=MAX_Y)
 a = fig.suptitle('PC1 vs time of all strains with annotated stages',
                  fontdict={'fontsize': 13, 'fontfamily': font})
 sampling_times = [time for time in DATA_TRANSFORMED['x'].unique() if time % 4 == 0]

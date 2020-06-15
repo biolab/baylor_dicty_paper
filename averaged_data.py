@@ -1,18 +1,20 @@
+print('Preparing averaged data.')
+
 import os
 import pandas as pd
 import numpy as np
 
-from helper import merge_genes_conditions, split_data,GROUPS, STAGES,PATH_RESULTS, PATH_DATA
+from helper import merge_genes_conditions, split_data, GROUPS, STAGES, PATH_RESULTS, PATH_DATA
 
 # *******************
 # **** Manage data (load data, specify saving path)
 # Path to data
-path_results = PATH_RESULTS+'averaged/'
+path_results = PATH_RESULTS + 'averaged/'
 if not os.path.exists(path_results):
     os.makedirs(path_results)
 
 # Load expression data
-genes = pd.read_csv(PATH_DATA+ 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
+genes = pd.read_csv(PATH_DATA + 'mergedGenes_RPKUM.tsv', sep='\t', index_col=0)
 conditions = pd.read_csv(PATH_DATA + 'conditions_mergedGenes.tsv', sep='\t', index_col=None)
 
 STRAIN_ORDER = pd.read_table(PATH_DATA + 'strain_order.tsv', header=None).values.ravel()
@@ -73,12 +75,13 @@ genes_avg_scaled.to_csv(path_results + 'genes_averaged_scaled_percentile' + str(
 pattern_data = []
 genes_avg_ax4 = genes_avg.query('Strain=="AX4"')
 genes_avg_ax4.index = genes_avg_ax4['Time']
-genes_avg_ax4=genes_avg_ax4.T.drop(['Strain','Group','Time'])
+genes_avg_ax4 = genes_avg_ax4.T.drop(['Strain', 'Group', 'Time'])
 for gene, data in genes_avg_ax4.iterrows():
     peak = data.sort_values().index[-1]
-    pattern_data.append({'Gene': gene,'Peak': peak})
-pattern_data=pd.DataFrame(pattern_data)
-pattern_data.to_csv(path_results+'gene_peaks_AX4.tsv', sep='\t', index=False)
+    pattern_data.append({'Gene': gene, 'Peak': peak})
+pattern_data = pd.DataFrame(pattern_data)
+pattern_data.to_csv(path_results + 'gene_peaks_AX4.tsv', sep='\t', index=False)
+
 
 # ****************************
 # **** Developmental stages averaged across replicates of a strain by timepoint
@@ -96,7 +99,7 @@ def set_infered(averaged: dict, infered_stages: list):
         averaged[col] = fill
 
 
-def avgsample_name(group:tuple) -> str:
+def avgsample_name(group: tuple) -> str:
     """
     Make a sample name from strain,time tuple obtained from pandas groupby
     :param group: Tuple with strain,time
@@ -107,7 +110,7 @@ def avgsample_name(group:tuple) -> str:
 
 # TOOD rename this file
 conditions_originalstage = pd.read_csv(PATH_DATA + 'conditions_noninfered_mergedGenes.tsv', sep='\t',
-                                            index_col=None).sort_values(['Strain', 'Time'])
+                                       index_col=None).sort_values(['Strain', 'Time'])
 # Make averaged stages data, averaging samples by strain and time
 averaged_stages = pd.DataFrame(columns=STAGES)
 grouped = conditions_originalstage.groupby(['Strain', 'Time'])
@@ -174,11 +177,11 @@ genes_avg_stage = genes_avg_stage.sort_values(['Strain', 'main_stage'])
 # Add metadata
 genes_avg_stage['Group'] = [GROUPS[strain] for strain in genes_avg_stage['Strain']]
 genes_avg_stage.index = [strain + '_' + main
-                                for strain, main in genes_avg_stage[['Strain', 'main_stage']].values]
+                         for strain, main in genes_avg_stage[['Strain', 'main_stage']].values]
 
 # *** Scale
 genes_avg_scaled_stage = genes_avg_stage.copy()
-genes_avg_scaled_stage = genes_avg_scaled_stage.drop(['Strain', 'main_stage','Group'], axis=1)
+genes_avg_scaled_stage = genes_avg_scaled_stage.drop(['Strain', 'main_stage', 'Group'], axis=1)
 # Scale with Xth percentile (given as ratio) of each gene
 percentile = 0.99
 genes_avg_percentile_stage = genes_avg_scaled_stage.quantile(q=percentile, axis=0)
@@ -188,7 +191,7 @@ genes_avg_scaled_stage = genes_avg_scaled_stage / genes_avg_percentile_stage
 # Set upper limit to scaled expression values for better representation on colour scale
 max_val = 0.1
 genes_avg_scaled_stage[genes_avg_scaled_stage > max_val] = max_val
-genes_avg_scaled_stage[['Strain', 'main_stage','Group']] = genes_avg_stage[['Strain', 'main_stage','Group']]
+genes_avg_scaled_stage[['Strain', 'main_stage', 'Group']] = genes_avg_stage[['Strain', 'main_stage', 'Group']]
 
 genes_avg_scaled_stage.to_csv(path_results + 'genes_averaged_mainStage_scale_percentile' + str(percentile)[2:] +
                               '_max' + str(max_val) + '.tsv', sep='\t')

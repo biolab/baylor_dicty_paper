@@ -1,3 +1,5 @@
+print('Preparing milestones data.')
+
 import os
 import pandas as pd
 import numpy as np
@@ -6,7 +8,7 @@ from statsmodels.stats.multitest import multipletests
 
 from helper import PATH_RESULTS
 
-path_save = PATH_RESULTS+'milestones/'
+path_save = PATH_RESULTS + 'milestones/'
 if not os.path.exists(path_save):
     os.makedirs(path_save)
 # ************************

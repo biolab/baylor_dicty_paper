@@ -1,3 +1,5 @@
+print('Preparing expression heatmaps.')
+
 library(ComplexHeatmap)
 library(circlize)
 library(viridis)
@@ -10,7 +12,6 @@ library(dendextend)
 font_import(prompt = FALSE)
 loadfonts(device = "postscript")
 loadfonts(device = "pdf")
-
 
 # ************
 # ** Load data shared across heatmaps
