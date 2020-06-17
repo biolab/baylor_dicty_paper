@@ -22,6 +22,8 @@ for idx in range(len(stages) - 1):
     stage2 = stages[idx + 1]
     f = path_save + 'DE_' + stage2 + '_ref_' + stage1 + '.tsv'
     data = pd.read_table(f, index_col=0)[['log2FoldChange', 'pvalue', 'padj']]
+    # Remove genes for which pvalue was not calculated (e.g. outliers)
+    data = data[~data['pvalue'].isna()]
     data.columns = [stage1 + '_' + stage2 + '_' + col for col in data.columns]
     combined.append(data)
 combined = pd.concat(combined, axis=1, sort=True)

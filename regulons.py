@@ -113,11 +113,12 @@ class NeighbourCalculator:
         genes_index, genes_query = NeighbourCalculator.get_index_query(genes=genes, inverse=inverse, scale=scale,
                                                                        log=log,
                                                                        genes_query_data=genes_query_data)
+        # Random state was not set during the analysis in the paper so the obtained results might differ slightly
         try:
-            index = NNDescent(genes_index, n_jobs=THREADS, metric='cosine')
+            index = NNDescent(genes_index, n_jobs=THREADS, metric='cosine', random_state=0)
         except ValueError:
             try:
-                index = NNDescent(genes_index, tree_init=False, n_jobs=THREADS)
+                index = NNDescent(genes_index, tree_init=False, n_jobs=THREADS, random_state=0)
                 warnings.warn(
                     'Dataset ' + description + ' index computed without tree initialisation',
                     Warning)
@@ -308,29 +309,20 @@ class NeighbourCalculator:
     def cosine_dist_to_sim(dist):
         """
         Works on cosine and Pearson correlation distances.
-        If dist is below 0 or above 2 it will be set to 0 or 2, respectively. An exception is raised if the
-        number is  different from 0 or 2 after rounding to 5 decimal places.
-        :param dist: Number or np.ndaray
+        An exception is raised if the number is  different from 0 or 2 after rounding to 4 decimal places.
+        :param dist: Float or np.ndaray
         """
-        # Some distances are slightly below 0 or above 2 due to numerical precision - set them to 0 or 2, respectively.
+        # Some distances are slightly below 0 or above 2 due to numerical precision.
         if isinstance(dist, float):
-            if dist < 0:
-                if round(dist, 5) < 0:
-                    raise ValueError('Odd cosine distance (below 0), will be set to 0.')
-                dist = 0
-            elif dist > 2:
-                if round(dist, 5) > 2:
-                    raise ValueError('Odd cosine distance (above 2), will be set to 2.')
-                dist = 2
+            if round(dist, 4) < 0:
+                raise ValueError('Odd cosine distance below 0.')
+            if round(dist, 4) > 2:
+                raise ValueError('Odd cosine distance above 2.')
         elif isinstance(dist, np.ndarray):
-            if dist.any() < 0:
-                if np.around(dist, 5).any() < 0:
-                    raise ValueError('Odd cosine distance (below 0), will be set to 0.')
-                dist[dist < 0] = 0
-            elif dist.any() > 2:
-                if np.around(dist, 5).any() > 2:
-                    raise ValueError('Odd cosine distance (above 2), will be set to 2.')
-                dist[dist > 2] = 2
+            if np.around(dist, 4).any() < 0:
+                raise ValueError('Odd cosine distance below 0.')
+            if np.around(dist, 4).any() > 2:
+                raise ValueError('Odd cosine distance above 2.')
         else:
             raise ValueError('The parameter dist must be float or np.ndarray.')
         return 1 - dist
@@ -427,9 +419,9 @@ merged_results.to_csv(path_results + 'strainMergedNeighbours_kN' + str(KNN) + '_
 
 # Expression threshold for assuming that a gene is expressed in a strain:
 # 10% of 99th percentile of expression across samples
-ration_max = 0.99
+ratio_max = 0.99
 proportion = 0.1
-threshold = genes.quantile(q=ration_max, axis=1) * proportion
+threshold = genes.quantile(q=ratio_max, axis=1) * proportion
 
 # For each gene count how many strains are assumed to have the gene expressed, based on the above threshold
 SPLITBY = 'Strain'
@@ -462,5 +454,5 @@ merged_results_filtered = merged_results.drop(index=remove_genes, columns=remove
 
 merged_results_filtered.to_csv(path_results + 'regulonGenes_kN' + str(KNN) + '_mean0std1_log_highest' +
                                str(1 - THRESHOLD_QUANTILE) +
-                               '_minExpressed' + str(ration_max) + str(proportion) +
+                               '_minExpressed' + str(ratio_max) + str(proportion) +
                                '_strainFilterMin' + str(min_strains) + 'Max' + str(max_strains) + '.tsv', sep='\t')

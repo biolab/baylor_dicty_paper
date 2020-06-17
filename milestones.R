@@ -56,11 +56,16 @@ buildDDS <- function(conditions, genes, case, ref, design, main_lvl, filter = 1)
 #' @param path (str) Directory path for saving the results, ending with '/'. The file is saved within the directory
 #' with name DE_sample_ref_ref.tsv, where sample and second ref are parameters.
 #' If NULL results are not saved and are instead returned.
+#' @param removeNA Remove any rows in results that contain NA.
 #' @returns Processed results dataframe; if path is NULL.
-testDE <- function(dds, sample, ref, main_lvl, path = NULL) {
+testDE <- function(dds, sample, ref, main_lvl, path = NULL, removeNA = TRUE) {
   res <- results(dds, contrast = c(main_lvl, sample, ref), parallel = TRUE)
   print(summary(res))
-  resNN <- na.omit(res)
+  if (removeNA) {
+    resNN <- na.omit(res)
+  }else {
+    resNN <- res
+  }
   resOrder <- resNN[order(resNN$padj),]
   if (is.null(path)) {
     return(resOrder)
@@ -82,15 +87,18 @@ testDE <- function(dds, sample, ref, main_lvl, path = NULL) {
 #' @param path (str) Path for saving the results of DE analysis, as specified in testDE.
 #' Name is modified based on testDE function.
 #' @param save_dds_path (str) Path for saving DESeqDataSet object after calling DESeq on it. Should be a directory path
+#' @param removeNA Remove any rows in results that contain NA.
 #' ending in '|'. File is named case_ref_control.rds, where case and control are parameters.
-runDeSeq2 <- function(conditions, genes, case, control, design, main_lvl, path = NULL, save_dds_path = NULL) {
+runDeSeq2 <- function(conditions, genes, case, control, design, main_lvl, path = NULL, save_dds_path = NULL,
+                      removeNA = TRUE) {
   dds <- buildDDS(conditions = conditions, genes = genes, case = case, ref = control, design = design, main_lvl = main_lvl, filter = 1)$dds
   dds <- DESeq(dds, parallel = TRUE)
   if (!is.null(save_dds_path)) {
     saveRDS(object = dds, file = paste(path, case, '_ref_', control, '.rds', sep = ''))
   }
-  if (is.null(path)) return(testDE(dds = dds, sample = case, ref = control, path = path, main_lvl = main_lvl))
-  else testDE(dds = dds, sample = case, ref = control, path = path, main_lvl = main_lvl)
+  if (is.null(path)) return(testDE(dds = dds, sample = case, ref = control, path = path, main_lvl = main_lvl,
+                                   removeNA = removeNA))
+  else testDE(dds = dds, sample = case, ref = control, path = path, main_lvl = main_lvl, removeNA = removeNA)
 }
 
 # *****************
@@ -98,7 +106,7 @@ runDeSeq2 <- function(conditions, genes, case, control, design, main_lvl, path =
 
 # Threads
 THREADS <- detectCores() - 1
-if(THREADS>30) THREADS<-30
+if (THREADS > 30) THREADS <- 30
 register(MulticoreParam(THREADS))
 
 path_data <- 'Data/'
@@ -137,7 +145,8 @@ for (idx in 1:(length(STAGES) - 1)) {
     design_formula <- ~main_stage
 
     res <- runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = stage2, control = stage1,
-                     design = design_formula, main_lvl = 'main_stage', path = path_save, save_dds_path = path_save)
+                     design = design_formula, main_lvl = 'main_stage', path = path_save, save_dds_path = path_save,
+                     removeNA = FALSE)
   }
 }
 
