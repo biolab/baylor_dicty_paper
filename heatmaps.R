@@ -258,22 +258,19 @@ colours_regulons2_map <- colours_regulons2[1:length(unique(regulons2$Cluster))]
 regulons2_clusters <- as.vector(unique(regulons2$Cluster))
 names(colours_regulons2_map) <- regulons2_clusters[order(nchar(regulons2_clusters), regulons2_clusters)]
 
-# *** Plot AX4 or all strains based regulons
-# Plot either 'all' strains based or 'AX4' based regulons - set this for regulons_type
-regulons_type <- 'all'
-regulons_file <- NULL
-regulon_to_letters <- NULL
-if (regulons_type == 'AX4') {
-  regulons_file <- "mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab"
-  regulon_to_letters <- TRUE
-} else if (regulons_type == 'all') {
-  regulons_file <- 'mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersLouvain0.4minmaxNologPCA30kN30.tab'
-  regulon_to_letters <- FALSE
-}
+# *** Plot AX4 and all strains based regulons
+# Plot all strains based or AX4 based regulons.
+regulons_data<-list(all=list(
+  file='regulonsAll.tab', letters=FALSE),
+  'AX4'=list(file="regulonsAX4.tab", letters=TRUE))
+for (regulons_data_sub in regulons_data){
+  regulons_file<-regulons_data_sub$file
+  regulon_to_letters<-regulons_data_sub$letters
+
 # Regulon groups tab file: First column lists genes and
 # a column named Cluster specifying cluster/regulon of each gene
 regulons <- read.table(paste(path_regulons, regulons_file, sep = ''), header = TRUE, sep = "\t")
-#Name the first column (should contain genes
+# Name the first column (should contain genes)
 colnames(regulons)[1] <- 'Gene'
 
 # Get regulons - list unique and sort
@@ -305,8 +302,8 @@ for (cluster in cluster_order$Cluster) {
   # Remove 'C' from cluster name
   # The as.character ensures that the code works with numeric clusters
   cluster_anno <- gsub('C', '', as.character(cluster))
-  # Rename cluster number to a letter for AX4 regulons
-  if (regulons_type == 'AX4') cluster_anno <- LETTERS[as.integer(cluster_anno)]
+  # Rename cluster number to a letter (for AX4)
+  if (regulon_to_letters) cluster_anno <- LETTERS[as.integer(cluster_anno)]
 
   heatmap <- Heatmap(t(avg_expression[, genes]), cluster_columns = FALSE, cluster_rows = FALSE, show_column_names = FALSE,
                      show_row_names = FALSE, col = viridis(256), column_title = NULL,
@@ -326,7 +323,7 @@ for (cluster in cluster_order$Cluster) {
 pdf(paste0(path_save, 'expressionHeatmap_regulons_', regulons_file, '.pdf'), width = 35, height = 25)
 ht_list
 graphics.off()
-
+}
 # ***************************
 # ****** Milestones heatmap
 
