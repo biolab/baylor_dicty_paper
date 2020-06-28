@@ -195,3 +195,35 @@ genes_avg_scaled_stage[['Strain', 'main_stage', 'Group']] = genes_avg_stage[['St
 
 genes_avg_scaled_stage.to_csv(path_results + 'genes_averaged_mainStage_scale_percentile' + str(percentile)[2:] +
                               '_max' + str(max_val) + '.tsv', sep='\t')
+
+# *******************
+# *** Averaged data from Nichols, et al. (2020)
+genes_mb = pd.read_csv(PATH_DATA + 'mediaBuffer_RPKUM.tsv', sep='\t', index_col=0)
+conditions_mb = pd.read_csv(PATH_DATA + 'mediaBuffer_mergedGenes.tsv', sep='\t', index_col=None)
+
+# Average expression
+genes_group_mb = genes_mb[conditions_mb.Measurment].copy().T
+genes_group_mb = genes_group_mb.join(pd.DataFrame(conditions_mb[['Group', 'Time']].values,
+                                            index=conditions_mb['Measurment'], columns=['Group', 'Time']))
+averaged_mb = genes_group_mb.groupby(['Group', 'Time']).mean().reset_index()
+# Sort by Group and Time
+averaged_mb['Group'] = pd.Categorical(averaged_mb['Group'], categories=['buff','media'], ordered=True)
+averaged_mb = averaged_mb.sort_values(['Group', 'Time'])
+
+# Scale the data
+percentile = 0.99
+max_val = 0.1
+genes_avg_scaled_mb = averaged_mb.copy()
+genes_avg_scaled_mb = genes_avg_scaled_mb.drop(['Group', 'Time'], axis=1)
+genes_avg_percentile_mb = genes_avg_scaled_mb.quantile(q=percentile, axis=0)
+genes_avg_scaled_mb = genes_avg_scaled_mb - genes_avg_percentile_mb
+genes_avg_percentile_mb = genes_avg_percentile_mb.replace(0, 1)
+genes_avg_scaled_mb = genes_avg_scaled_mb / genes_avg_percentile_mb
+# Limit at max 0.1 (to remove outliers in visualisation)
+genes_avg_scaled_mb[genes_avg_scaled_mb > max_val] = max_val
+genes_avg_scaled_mb[['Group', 'Time']] = averaged_mb[['Group', 'Time']]
+genes_avg_scaled_mb.index = [group + '_' + str(time)
+                                 for group, time in genes_avg_scaled_mb[['Group', 'Time']].values]
+
+genes_avg_scaled_mb.to_csv(path_results + 'genesMediaBuffer_averaged_scaled_percentile' + str(percentile)[2:] +
+                        '_max' + str(max_val) + '.tsv', sep='\t')

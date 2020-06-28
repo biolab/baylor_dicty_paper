@@ -32,6 +32,8 @@ for (strain in c('tgrB1', 'tgrB1C1', 'AX4', 'comH', 'tagB')) {
     replicates_both <- intersect(unique(samples1$Replicate), unique(samples2$Replicate))
     conditions_sub <- rbind(samples1, samples2)
     conditions_sub <- conditions_sub[conditions_sub$Replicate %in% replicates_both,]
+    print(paste('N samples 1', sum(conditions_sub$Comparison == name1),
+                'N samples 2', sum(conditions_sub$Comparison == name2)))
     genes_sub <- genes[, rownames(conditions_sub)]
 
     # Make DESeq2 comparison
@@ -40,9 +42,9 @@ for (strain in c('tgrB1', 'tgrB1C1', 'AX4', 'comH', 'tagB')) {
     # Adjust for the used padj threshold
     fdr_optim <- 0.01
     path_save_comparison <- paste0(path_save, strain, '_confoundRep_FDRoptim', fdr_optim, '_')
-    res <- runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = name2, control = name1,
-                     design = design_formula, main_lvl = 'Comparison',
-                     path = path_save_comparison, alpha = fdr_optim
+    runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = name2, control = name1,
+              design = design_formula, main_lvl = 'Comparison',
+              path = path_save_comparison, alpha = fdr_optim
     )
   }
 }
@@ -61,17 +63,51 @@ samples1 <- conditions[(conditions$Strain == 'tgrB1' & conditions$Time %in% time
 samples2 <- conditions[conditions$Strain == 'AX4', c('Strain', 'Time')]
 samples1['Comparison'] <- name1
 samples2['Comparison'] <- name2
+print(paste('N samples 1', nrow(samples1), 'N sam,ples 2', nrow(samples2)))
 conditions_sub <- rbind(samples1, samples2)
 genes_sub <- genes[, rownames(conditions_sub)]
 
 # Run DESeq2
 design_formula <- ~Comparison
-print(dim(genes_sub))
 # Alternative hypothesis and FDR optimisation
 alternative <- 'greater'
 fdr_optim <- 0.01
 path_save_comparison <- paste0(path_save, 'tagdisVSAX4all_alternative', alternative, '_FDRoptim', fdr_optim, '_')
-res <- runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = name1, control = name2,
-                 design = design_formula, main_lvl = 'Comparison', path = path_save_comparison,
-                 altHypothesis = alternative, alpha = fdr_optim
+runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = name1, control = name2,
+          design = design_formula, main_lvl = 'Comparison', path = path_save_comparison,
+          altHypothesis = alternative, alpha = fdr_optim
+)
+
+# **********************
+# *** DE genes in data from Nichols, et al. (2020)
+print('Performing analysis for data from Nichols, et al. (2020)')
+# *** Load data from Nichols, et al. (2020)
+genes_mb <- read.table(paste(path_data, "mediaBuffer_counts.tsv", sep = ''), header = TRUE, row.names = 1, sep = "\t")
+conditions_mb <- read.table(paste(path_data, "conditions_mediaBuffer.tsv", sep = ''), header = TRUE,
+                            row.names = 'Measurment', sep = "\t")
+rownames(conditions_mb) <- make.names(rownames(conditions_mb))
+
+# *** DE analysis - compare specific media timepoints towards all buffer samples
+# Media timepoints
+times <- c(0.5, 1, 2)
+# Prepare DESeq2 input data
+name1 <- paste0('media', paste(times, collapse = 'hr'), 'hr')
+name2 <- "bufferAll"
+samples1 <- conditions_mb[(conditions_mb$Group == 'media' & conditions_mb$Time %in% times), c('Group', 'Time')]
+samples2 <- conditions_mb[conditions_mb$Group == 'buff', c('Group', 'Time')]
+samples1['Comparison'] <- name1
+samples2['Comparison'] <- name2
+print(paste('N samples 1', nrow(samples1), 'N sam,ples 2', nrow(samples2)))
+conditions_sub <- rbind(samples1, samples2)
+genes_sub <- genes_mb[, rownames(conditions_sub)]
+design_formula <- ~Comparison
+# Alternative hypothesis and FDR optimisation
+alternative <- 'greater'
+fdr_optim <- 0.01
+
+path_save_comparison <- paste0(path_save, 'mediaVSbufferAll_',
+                               'alternative', alternative, '_FDRoptim', fdr_optim, '_')
+runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = name1, control = name2,
+          design = design_formula, main_lvl = 'Comparison', path = path_save_comparison,
+          altHypothesis = alternative, alpha = fdr_optim
 )

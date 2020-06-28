@@ -50,10 +50,15 @@ phenotype_cols <- c('no image' = '#d9d9d9', 'no_agg' = '#ed1c24', 'stream' = '#9
 #' @param genes List of genes to order
 #' @param avg_expression DF with genes in columns and expression samples in rows. It must hae Strain column
 #'    so that AX4 data can be selected.
+#' @param only_ax4 If TRUE use only avg_expression rows that have "Strain" column value equal to "AX4"
 #' @returns Ordered list of genes
-optically_order_genes <- function(genes, avg_expression) {
-  if (length(genes) > 1) {
-    expression <- t(avg_expression[avg_expression$Strain == 'AX4', genes])
+optically_order_genes <- function(genes, avg_expression,only_ax4=TRUE) {
+  if (length(genes) > 2) {
+    if(only_ax4){
+      expression <- t(avg_expression[avg_expression$Strain == 'AX4', genes])
+    }else{
+      expression <- t(avg_expression[, genes])
+    }
     distances <- dist(expression, method = "Euclidean")
     hc <- hclust(d = distances, method = "ward.D2")
     hc_ordered <- reorder(x = hc, dist = distances)
@@ -396,7 +401,7 @@ draw(ht_list)
 graphics.off()
 
 # *** Heatmap for genes upregulated in tag_dis group compared to whole AX4 profile
-ht_list <- make_annotation(phenotypes_font, legend_height, legend_width, top_annotation_height, phenotype_annotation_height, cluster_font)
+ht_list <- make_annotation()
 
 # Find DE genes
 data <- read.table(paste0(path_disaggregation,
@@ -432,6 +437,95 @@ pdf(paste0(path_save,
 draw(ht_list)
 graphics.off()
 
+# *** Heatmap for genes obtained on data from Nichols, et al. (2020)
+
+# *** Find upregulated genes on data from Nichols, et al. (2020)
+data_mb<-read.table(paste0(path_disaggregation,
+                           'mediaVSbufferAll_alternativegreater_FDRoptim0.01_DE_media0.5hr1hr2hr_ref_bufferAll.tsv'),
+                    sep='\t',header=TRUE,row.names=1)
+padj <- 0.01
+lfc <- 2
+genes<-rownames(data_mb)[data_mb$padj <= padj & data_mb$log2FoldChange >= lfc]
+genes<-optically_order_genes(genes = genes, avg_expression = avg_expression)
+
+# *** Draw heatmap on data used for other heatmaps
+ht_list<-make_annotation()
+heatmap <- Heatmap(t(avg_expression[, genes]), cluster_columns = FALSE, cluster_rows = FALSE,
+                   show_column_names = FALSE,show_row_names = FALSE, col=viridis(256),
+                   column_title=NULL, show_heatmap_legend = TRUE,
+                   heatmap_legend_param = list(
+                    title = "\nRelative \nexpression\n",
+                    at = c(min_expression, round(mean(c(min_expression,max_expression)),1),max_expression),
+                    grid_width= unit(legend_width, "cm"),grid_height= unit(legened_height, "cm") ,
+                    labels_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily),
+                    title_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily)
+                   )
+)
+ht_list <- ht_list %v% heatmap
+
+pdf(paste0(path_save,
+           'expressionHeatmap_mediaVSbufferAll_alternativegreater_FDRoptim0.01_DE_media0.5hr1hr2hr_ref_bufferAll_padj',
+           padj,'lfc',lfc,'.pdf'), width = 35, height = 8)
+draw(ht_list)
+graphics.off()
+
+# *** Draw heatmap on data from Nichols, et al. (2020)
+
+# Load new expression data and reorder genes
+avg_expression_mb<-read.table(paste0(path_avg,"genesMediaBuffer_averaged_scaled_percentile99_max0.1.tsv"),
+                          header=TRUE,row.names=1, sep="\t")
+genes<-optically_order_genes(genes=genes,avg_expression=avg_expression_mb,ax4=FALSE)
+
+# Header annotation
+# Time annotation
+times_mb<-unique(avg_expression_mb['Time'])
+col_time_mb <- colorRamp2(c(min(times_mb), max(times_mb)), c("white", "#440154FF"))
+ht_list <- Heatmap(t(avg_expression_mb['Time']), height = unit(top_annotation_height, "cm"),
+                   # Split by media and buffer
+                   column_split=factor(avg_expression_mb$Group),column_title =NULL,
+                   cluster_columns=FALSE,cluster_rows=FALSE,
+                   show_column_names = FALSE, name='\nTime\n', col=col_time_mb,
+                   heatmap_legend_param = list(
+                     at = c(min(times_mb),as.integer(mean(c(min(times_mb),max(times_mb)))),max(times_mb)),
+                     grid_width= unit(legend_width, "cm"),grid_height= unit(legened_height, "cm") ,
+                     labels_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily),
+                     title_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily)
+                   ),
+                   row_names_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily),
+                   # Group annotation
+                   top_annotation = HeatmapAnnotation(
+                    Group=anno_block(gp =
+                                       gpar(
+                                         fill=c('#00b2ff','#ed1c24'),col=c('#00b2ff','#ed1c24'),
+                                         lwd =2,linejoin='mitre'
+                                       ),
+                                      labels = c('buff','media') ,
+                                     labels_gp = gpar(col ='black',fontsize = cluster_font,fontfamily=fontfamily),
+                                     show_name = TRUE),
+                    annotation_name_gp=gpar(fontsize = cluster_font,fontfamily=fontfamily)
+                  )
+  )
+
+# Expression heatmap
+heatmap <- Heatmap(t(avg_expression_mb[, genes]), cluster_columns = FALSE, cluster_rows = FALSE,
+                   show_column_names = FALSE, show_row_names = FALSE, col=viridis(256), column_title=NULL,
+                   show_heatmap_legend = TRUE,
+                   heatmap_legend_param = list(
+                     title = "\nRelative \nexpression\n",
+                     at = c(min_expression, round(mean(c(min_expression,max_expression)),1),max_expression),
+                     grid_width= unit(legend_width, "cm"),grid_height= unit(legened_height, "cm") ,
+                     labels_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily),
+                     title_gp = gpar(fontsize = cluster_font,fontfamily=fontfamily)
+                   )
+)
+
+# Combine annotation and expression heatmaps
+ht_list <- ht_list %v% heatmap
+pdf(paste0(path_save,
+           'expressionHeatmapMediaBuffer_mediaVSbufferAll_alternativegreater_FDRoptim0.01_DE_media0.5hr1hr2hr_ref_bufferAll_padj',
+           padj,'lfc',lfc,'.pdf'), width = 10, height = 8)
+draw(ht_list)
+graphics.off()
 
 # ***************************
 # ****** Milestones heatmap
