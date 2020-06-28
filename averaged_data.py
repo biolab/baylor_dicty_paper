@@ -199,7 +199,7 @@ genes_avg_scaled_stage.to_csv(path_results + 'genes_averaged_mainStage_scale_per
 # *******************
 # *** Averaged data from Nichols, et al. (2020)
 genes_mb = pd.read_csv(PATH_DATA + 'mediaBuffer_RPKUM.tsv', sep='\t', index_col=0)
-conditions_mb = pd.read_csv(PATH_DATA + 'mediaBuffer_mergedGenes.tsv', sep='\t', index_col=None)
+conditions_mb = pd.read_csv(PATH_DATA + 'conditions_mediaBuffer.tsv', sep='\t', index_col=None)
 
 # Average expression
 genes_group_mb = genes_mb[conditions_mb.Measurment].copy().T

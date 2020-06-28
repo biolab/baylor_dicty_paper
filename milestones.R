@@ -44,8 +44,7 @@ for (idx in 1:(length(STAGES) - 1)) {
     design_formula <- ~main_stage
 
     res <- runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = stage2, control = stage1,
-                     design = design_formula, main_lvl = 'main_stage', path = path_save, save_dds_path = path_save,
-                     removeNA = FALSE)
+                     design = design_formula, main_lvl = 'main_stage', path = path_save, removeNA = FALSE)
   }
 }
 
