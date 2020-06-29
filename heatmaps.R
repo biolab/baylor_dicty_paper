@@ -89,6 +89,32 @@ for (col in colnames(avg_phenotype)) {
 strain_gap <- 1
 group_gap <- 2.5
 
+# Data used for phenotype groups and strains annotation
+group_data <- t(avg_expression['Group'])
+rownames(group_data) <- c('Phenotypic group')
+# Strain group colours, heatmap column blocks by strain, and heatmap column blocks gaps
+group_cols_ordered <- c()
+groups_ordered <- c()
+text_cols_ordered <- c()
+gaps <- c()
+previous_group <- NULL
+for (strain in strain_order) {
+  group <- as.character(avg_expression[avg_expression$Strain == strain, 'Group'][1])
+  groups_ordered <- append(groups_ordered, group)
+  group_cols_ordered <- append(group_cols_ordered, group_cols[group])
+  text_cols_ordered <- append(text_cols_ordered, group_cols_text[group])
+  # Gaps - if previous group was different add larger gap
+  if (!is.null(previous_group)) {
+    if (previous_group == group) {
+      gaps <- append(gaps, strain_gap)
+    }else {
+      gaps <- append(gaps, group_gap)
+    }
+  }
+  previous_group <- group
+}
+gaps <- unit(gaps, 'mm')
+
 # Annotation for regulons heatmap
 make_annotation <- function(phenotypes_font = parent.frame()$phenotypes_font,
                             legend_height = parent.frame()$legend_height,
@@ -96,31 +122,6 @@ make_annotation <- function(phenotypes_font = parent.frame()$phenotypes_font,
                             top_annotation_height = parent.frame()$top_annotation_height,
                             phenotype_annotation_height = parent.frame()$phenotype_annotation_height,
                             cluster_font = parent.frame()$cluster_font) {
-
-  group_data <- t(avg_expression['Group'])
-  rownames(group_data) <- c('Phenotypic group')
-  # Strain group colours, heatmap column blocks by strain, and heatmap column blocks gaps
-  group_cols_ordered <- c()
-  groups_ordered <- c()
-  text_cols_ordered <- c()
-  gaps <- c()
-  previous_group <- NULL
-  for (strain in strain_order) {
-    group <- as.character(avg_expression[avg_expression$Strain == strain, 'Group'][1])
-    groups_ordered <- append(groups_ordered, group)
-    group_cols_ordered <- append(group_cols_ordered, group_cols[group])
-    text_cols_ordered <- append(text_cols_ordered, group_cols_text[group])
-    # Gaps - if previous group was different add larger gap
-    if (!is.null(previous_group)) {
-      if (previous_group == group) {
-        gaps <- append(gaps, strain_gap)
-      }else {
-        gaps <- append(gaps, group_gap)
-      }
-    }
-    previous_group <- group
-  }
-  gaps <- unit(gaps, 'mm')
 
   # Time colours
   times <- unique(avg_expression$Time)
@@ -224,7 +225,7 @@ for (regulons_file in c("regulonsAX4.tab",
   # Load regulons
   # Regulon groups tab file: First column lists genes and
   # a column named Cluster specifying cluster/regulon of each gene
-  regulons <- read.table(paste(path_data, regulons_file, sep = ''), header = TRUE, sep = "\t")
+  regulons <- read.table(paste(path_regulons, regulons_file, sep = ''), header = TRUE, sep = "\t")
   #Name the first column (should contain genes
   colnames(regulons)[1] <- 'Gene'
 
@@ -244,8 +245,7 @@ for (regulons_file in c("regulonsAX4.tab",
 
 # Regulons reference (AX4) groups tab file (used for side annotation): First column lists genes and
 # a column named Cluster specifying cluster/regulon of each gene
-regulons2 <- read.table(paste(path_regulons,
-                              "mergedGenes_minExpressed0.990.1Strains1Min1Max18_clustersAX4Louvain0.8m0s1log.tab",
+regulons2 <- read.table(paste(path_regulons,"regulonsAX4.tab",
                               sep = ''), header = TRUE, sep = "\t")
 rownames(regulons2) <- regulons2[, 1]
 regulons2 <- regulons2[, 'Cluster', drop = F]
@@ -265,9 +265,12 @@ for (cluster in cluster_order2$Cluster) {
 
 # Reference (AX4) regulon colours: 13 distinct colours ordered by rainbow
 colours_regulons2 <- c('#800000', '#e6194b', '#f58231', '#9a6324', '#ffe119', '#9dd100', '#3cb44b', '#aaffc3',
-                       '#46f0f0', '#2e97ff', '#000075', '#911eb4', '#f032e6')
+                       '#46f0f0', '#2e97ff', '#000075', '#911eb4', '#f032e6','#ed95c5')
 # Refernce (AX4) regulons colour map
 colours_regulons2_map <- colours_regulons2[1:length(unique(regulons2$Cluster))]
+if(length(unique(regulons2$Cluster)) >length(colours_regulons2)){
+  print('Number of availiable colours is smaller than number of regulons. Add colours to variable colours_regulons2.')
+}
 regulons2_clusters <- as.vector(unique(regulons2$Cluster))
 names(colours_regulons2_map) <- regulons2_clusters[order(nchar(regulons2_clusters), regulons2_clusters)]
 
@@ -446,7 +449,7 @@ heatmap <- Heatmap(t(avg_expression[, genes]), cluster_columns = FALSE, cluster_
                    heatmap_legend_param = list(
                      title = "\nRelative \nexpression\n",
                      at = c(min_expression, round(mean(c(min_expression, max_expression)), 1), max_expression),
-                     grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+                     grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
                      labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
                      title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                    )
@@ -464,7 +467,7 @@ graphics.off()
 # Load new expression data and reorder genes
 avg_expression_mb <- read.table(paste0(path_avg, "genesMediaBuffer_averaged_scaled_percentile99_max0.1.tsv"),
                                 header = TRUE, row.names = 1, sep = "\t")
-genes <- optically_order_genes(genes = genes, avg_expression = avg_expression_mb, ax4 = FALSE)
+genes <- optically_order_genes(genes = genes, avg_expression = avg_expression_mb, only_ax4 = FALSE)
 
 # Header annotation
 # Time annotation
@@ -477,7 +480,7 @@ ht_list <- Heatmap(t(avg_expression_mb['Time']), height = unit(top_annotation_he
                    show_column_names = FALSE, name = '\nTime\n', col = col_time_mb,
                    heatmap_legend_param = list(
                      at = c(min(times_mb), as.integer(mean(c(min(times_mb), max(times_mb)))), max(times_mb)),
-                     grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+                     grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
                      labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
                      title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                    ),
@@ -497,7 +500,7 @@ ht_list <- Heatmap(t(avg_expression_mb['Time']), height = unit(top_annotation_he
 )
 
 # Expression range for legend
-expressions_mb <- within(avg_expression_mb, rm('Time', 'Strain', 'Group'))
+expressions_mb <- within(avg_expression_mb, rm('Time', 'Group'))
 min_expression_mb <- min(expressions_mb)
 max_expression_mb <- max(expressions_mb)
 
@@ -508,7 +511,7 @@ heatmap <- Heatmap(t(avg_expression_mb[, genes]), cluster_columns = FALSE, clust
                    heatmap_legend_param = list(
                      title = "\nRelative \nexpression\n",
                      at = c(min_expression_mb, round(mean(c(min_expression_mb, max_expression_mb)), 1), max_expression_mb),
-                     grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+                     grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
                      labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
                      title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                    )
@@ -524,7 +527,7 @@ graphics.off()
 
 # ***************************
 # *** UNUSED Aberrant neighbourhood heatmaps
-if(FALSE){
+#if(FALSE){
 # *** Prepare data
 path_aberrant <- 'Results/aberrant_neighbourhood/'
 
@@ -567,16 +570,15 @@ selected_cols <- list()
 for (group in strain_groups) {
   selected_cols[[group]] <- c('0' = 'white', '1' = group_cols[[group]])
 }
-
+ # Ordered unique group colours
+group_cols_ordered_unique<-(unlist(lapply(strain_groups, function(x) group_cols[[x]])))
 # *** Expression hetamap of selected genes in each group
 
-# List of ordered strain group colours
-group_cols_list <- as.vector(unlist(lapply(strain_groups, function(x) group_cols[[x]])))
 for (group in strain_groups) {
 
   # Select and order genes of a group
   genes <- rownames(all_abberant)[all_abberant[group] == 1]
-  print(paste('N selected genes in', group, ':', length(genes)))
+  #print(paste('Genes with aberrant neighbourhood: N selected genes in', group, ':', length(genes)))
   genes <- optically_order_genes(genes = genes, avg_expression = avg_expression)
 
   # Annotate rows with information about in which group genes were termed to have aberrant neighbourhood
@@ -589,8 +591,8 @@ for (group in strain_groups) {
   # Displays strain group colours, denoting that a gene was abberantly expressed
   lgd_list <- list(Legend(
     labels = strain_groups, title = "Aberrant\nneighborhood\n",
-    legend_gp = gpar(col = group_cols_list, fill = group_cols_list, fontsize = cluster_font, fontfamily = fontfamily),
-    grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+    legend_gp = gpar(col = group_cols_ordered_unique, fill = group_cols_ordered_unique, fontsize = cluster_font, fontfamily = fontfamily),
+    grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
     labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
     title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
   ))
@@ -604,7 +606,7 @@ for (group in strain_groups) {
                      heatmap_legend_param = list(
                        title = "\nRelative \nexpression\n",
                        at = c(min_expression, round(mean(c(min_expression, max_expression)), 1), max_expression),
-                       grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+                       grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
                        labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
                        title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                      ),
@@ -644,13 +646,14 @@ heatmap_selected <- Heatmap(as.matrix(abberant_colours),
                             col = group_cols, show_row_names = FALSE, na_col = 'white',
                             heatmap_legend_param = list(
                               title = "\nAberrant\nneighbourhood\n",
-                              grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+                              grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
                               labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
                               title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                             ),
                             column_title_gp = (gpar(fontsize = cluster_font, fontfamily = fontfamily)),
                             width = 3, column_names_side = "top"
 )
+
 
 # Heatmap of median similarities to gene neighbours across strains
 heatmap_sims <- Heatmap(as.matrix(median_sims[genes,]), col = rev(viridis(256)),
@@ -663,7 +666,7 @@ heatmap_sims <- Heatmap(as.matrix(median_sims[genes,]), col = rev(viridis(256)),
                         show_row_names = FALSE, show_column_names = FALSE,
                         heatmap_legend_param = list(
                           title = "\nMedian\nsimilarity\n",
-                          grid_width = unit(legend_width, "cm"), grid_height = unit(legened_height, "cm"),
+                          grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
                           labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
                           title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                         ),
@@ -680,7 +683,8 @@ heatmap_sims <- Heatmap(as.matrix(median_sims[genes,]), col = rev(viridis(256)),
                             gp =gpar(fill = 'white', col = group_cols_ordered, lwd = 2, linejoin = 'mitre'),
                             labels = strain_order,
                             labels_gp = gpar(col ='black', fontsize = cluster_font, fontfamily = fontfamily ),
-                            show_name = TRUE),
+                            show_name = TRUE
+                          ),
                           annotation_name_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
                         )
 )
@@ -689,7 +693,44 @@ pdf(paste0(path_save, 'selectedSimilarities_padj', FDR, 'MEdiff', MEDIFF,
 draw(heatmap_selected + heatmap_sims)
 graphics.off()
 
+# *** Heatmap of overlap between groups
+#' Overlap between two vectors normalised by the length of the smaller vector
+#' @param s1 vector 1
+#' @param s2 vector2
+#' @return len_overlap/len_smaller_vector
+proportion_smaller<-function(s1,s2){
+    return(length(intersect(s1,s2))/min(length(s1),length(s2)))
 }
+
+# Matrix with relative overlap between selected genes in each group
+n_groups<-length(strain_groups)
+group_overlap<-matrix(,nrow=n_groups,ncol=n_groups)
+for(i in 1:(n_groups-1)){
+    for(j in (1+i):n_groups){
+      genes1 <- rownames(all_abberant)[all_abberant[strain_groups[i]] == 1]
+      genes2<-rownames(all_abberant)[all_abberant[strain_groups[j]] == 1]
+      group_overlap[i,j]=proportion_smaller(genes1,genes2)
+    }
+}
+colnames(group_overlap)<-strain_groups
+rownames(group_overlap)<-strain_groups
+
+overlap_heatmap<-Heatmap(group_overlap,cluster_columns = FALSE,cluster_rows = FALSE,
+        col = viridis(256),
+        heatmap_legend_param = list(
+          title = "Ratio\nsmaller\noverlap\n",
+          grid_width = unit(legend_width, "cm"), grid_height = unit(legend_height, "cm"),
+          labels_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily),
+          title_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily)
+        ),
+        column_names_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily, col=group_cols_ordered_unique ),
+        row_names_gp = gpar(fontsize = cluster_font, fontfamily = fontfamily,col=group_cols_ordered_unique )
+)
+pdf(paste0(path_save, 'selectedOverlap_padj', FDR, 'MEdiff', MEDIFF,
+           '_AX4basedNeighByStrain_kN11_samples10resample10.pdf'), width = 8, height = 7)
+draw(overlap_heatmap)
+graphics.off()
+#}
 # ***************************
 # ****** Milestones heatmap
 

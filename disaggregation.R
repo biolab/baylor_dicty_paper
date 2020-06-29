@@ -32,8 +32,8 @@ for (strain in c('tgrB1', 'tgrB1C1', 'AX4', 'comH', 'tagB')) {
     replicates_both <- intersect(unique(samples1$Replicate), unique(samples2$Replicate))
     conditions_sub <- rbind(samples1, samples2)
     conditions_sub <- conditions_sub[conditions_sub$Replicate %in% replicates_both,]
-    print(paste('N samples 1', sum(conditions_sub$Comparison == name1),
-                'N samples 2', sum(conditions_sub$Comparison == name2)))
+    print(paste('N samples 1:', sum(conditions_sub$Comparison == name1),
+                'N samples 2:', sum(conditions_sub$Comparison == name2)))
     genes_sub <- genes[, rownames(conditions_sub)]
 
     # Make DESeq2 comparison
@@ -55,7 +55,7 @@ for (strain in c('tgrB1', 'tgrB1C1', 'AX4', 'comH', 'tagB')) {
 # Prepare data for DESeq2
 timepoints <- c(8, 10, 12)
 times_str <- paste0('hr', timepoints, collapse = '')
-name1 <- paste0('tgrB1', times_str, 'andtgrB1C', times_str)
+name1 <- paste0('tgrB1', times_str, 'andtgrB1C1', times_str)
 name2 <- "AX4all"
 print(paste('Comparing', name2, 'vs', name1))
 samples1 <- conditions[(conditions$Strain == 'tgrB1' & conditions$Time %in% timepoints) |
@@ -63,7 +63,7 @@ samples1 <- conditions[(conditions$Strain == 'tgrB1' & conditions$Time %in% time
 samples2 <- conditions[conditions$Strain == 'AX4', c('Strain', 'Time')]
 samples1['Comparison'] <- name1
 samples2['Comparison'] <- name2
-print(paste('N samples 1', nrow(samples1), 'N sam,ples 2', nrow(samples2)))
+print(paste('N samples 1:', nrow(samples1), 'N samples 2:', nrow(samples2)))
 conditions_sub <- rbind(samples1, samples2)
 genes_sub <- genes[, rownames(conditions_sub)]
 
@@ -97,7 +97,7 @@ samples1 <- conditions_mb[(conditions_mb$Group == 'media' & conditions_mb$Time %
 samples2 <- conditions_mb[conditions_mb$Group == 'buff', c('Group', 'Time')]
 samples1['Comparison'] <- name1
 samples2['Comparison'] <- name2
-print(paste('N samples 1', nrow(samples1), 'N sam,ples 2', nrow(samples2)))
+print(paste('N samples 1:', nrow(samples1), 'N samples 2:', nrow(samples2)))
 conditions_sub <- rbind(samples1, samples2)
 genes_sub <- genes_mb[, rownames(conditions_sub)]
 design_formula <- ~Comparison
