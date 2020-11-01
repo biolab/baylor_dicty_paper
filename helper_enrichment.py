@@ -279,8 +279,8 @@ def plot_enrichment_bar(df: pd.DataFrame, query_n, reference_n, used_padj, min_F
         'Pathways', 'Path.').replace(
         'Dictybase: Phenotypes', 'DB: Pheno.').replace(
         'Custom: Baylor', 'Custom') for ont in df['Ontology'].values]
-    df_plot['Group'] = ["%d (%.1f%%)" % (n, (100 * n / query_n)) for n in df['N in group']]
-    df_plot['Reference'] = ["%d (%.1f%%)" % (n, (100 * n / reference_n)) for n in df['N in ref.']]
+    df_plot['Group'] = ["%d (%.2f%%)" % (n, (100 * n / query_n)) for n in df['N in group']]
+    df_plot['Reference'] = ["%d (%.2f%%)" % (n, (100 * n / reference_n)) for n in df['N in ref.']]
     df_plot['FDR'] = df['FDR']
     df_plot = df_plot.sort_values('Fold enrichment', ascending=False)
 

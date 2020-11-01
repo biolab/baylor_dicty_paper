@@ -426,6 +426,15 @@ DATA_TRANSFORMED[['x', 'Group', 'Strain', 'Replicate'] + STAGES] = conditions[
     ['Time', 'Group', 'Strain', 'Replicate'] + STAGES]
 DATA_TRANSFORMED = DATA_TRANSFORMED.sort_values('x')
 
+# *** Explained variance by PC1 for each strain
+pca_named=pd.DataFrame(PCA_TRANSFORMED,index=data_strains.index)
+print('Explained variance by PC1 for each strain')
+for strain in conditions['Strain'].unique():
+    strain_samples=conditions.query('Strain ==@strain')['Measurment']
+    transformed_strain=pca_named.loc[strain_samples]
+    raw_strain=data_strains.loc[strain_samples,:]
+    print('%-12s%-12.3f' % (strain,transformed_strain.var()[0]/raw_strain.var().sum()))
+
 # *** GAM fitting to PC1 (Y) vs time (X) data
 
 # CV parameter combinations
