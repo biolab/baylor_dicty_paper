@@ -50,7 +50,8 @@ for (strain in c('tgrB1', 'tgrB1C1', 'AX4', 'comH', 'tagB')) {
 }
 
 # **********************
-# *** DE between specific tag_dis timepoints and all AX4 timepoints
+# *** DE between specific tag_dis timepoints and all AX4 timepoints - UNUSED
+if (FALSE){
 
 # Prepare data for DESeq2
 timepoints <- c(8, 10, 12)
@@ -78,6 +79,7 @@ runDeSeq2(conditions = conditions_sub, genes = genes_sub, case = name1, control 
           altHypothesis = alternative, alpha = fdr_optim
 )
 
+}
 # **********************
 # *** DE genes in data from Nichols, et al. (2020)
 print('Performing analysis for data from Nichols, et al. (2020)')

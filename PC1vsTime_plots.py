@@ -18,6 +18,7 @@ import pygam
 
 from helper import save_pickle, GROUPS, STAGES, PATH_RESULTS, PATH_DATA
 
+
 # ***********************
 # **** Helper functions
 
@@ -427,13 +428,13 @@ DATA_TRANSFORMED[['x', 'Group', 'Strain', 'Replicate'] + STAGES] = conditions[
 DATA_TRANSFORMED = DATA_TRANSFORMED.sort_values('x')
 
 # *** Explained variance by PC1 for each strain
-pca_named=pd.DataFrame(PCA_TRANSFORMED,index=data_strains.index)
+pca_named = pd.DataFrame(PCA_TRANSFORMED, index=data_strains.index)
 print('Explained variance by PC1 for each strain')
 for strain in conditions['Strain'].unique():
-    strain_samples=conditions.query('Strain ==@strain')['Measurment']
-    transformed_strain=pca_named.loc[strain_samples]
-    raw_strain=data_strains.loc[strain_samples,:]
-    print('%-12s%-12.3f' % (strain,transformed_strain.var()[0]/raw_strain.var().sum()))
+    strain_samples = conditions.query('Strain ==@strain')['Measurment']
+    transformed_strain = pca_named.loc[strain_samples]
+    raw_strain = data_strains.loc[strain_samples, :]
+    print('%-12s%-12.3f' % (strain, transformed_strain.var()[0] / raw_strain.var().sum()))
 
 # *** GAM fitting to PC1 (Y) vs time (X) data
 
@@ -511,6 +512,7 @@ plt.rcParams['axes.xmargin'] = 0.01
 plt.rcParams['axes.ymargin'] = 0.01
 
 # *** Plots of fitted GAMs to individual strains with shown sample points
+replicates_cmap_name = 'tab10'
 for strain in conditions['Strain'].unique():
     data_transformed = DATA_TRANSFORMED.query('Strain =="' + strain + '"')
     data_transformed = data_transformed.sort_values('x')
@@ -528,7 +530,7 @@ for strain in conditions['Strain'].unique():
     # Colour each replicate separately
     replicates = data_transformed['Replicate']
     replicates_unique = list(replicates.unique())
-    cmap = plt.get_cmap('tab10').colors[:len(replicates_unique)]
+    cmap = plt.get_cmap(replicates_cmap_name).colors[:len(replicates_unique)]
     rep_colours = dict(zip(replicates_unique, cmap))
     ax.scatter(data_transformed['x'], data_transformed['y'], c=[rep_colours[rep] for rep in replicates], alpha=0.7)
     ax.set_title(strain, fontdict={'fontsize': 13, 'fontfamily': font})
@@ -545,7 +547,24 @@ for strain in conditions['Strain'].unique():
     plt.savefig(path_save + 'GAM_' + strain + '.pdf')
     plt.close()
 
-# *** Strain plots with developmental stages annotation
+# Plot replicate legend for all images - needed for editing images latter
+fig, ax = plt.subplots()
+for strain in conditions['Strain'].unique():
+    data_transformed = DATA_TRANSFORMED.query('Strain =="' + strain + '"')
+    replicates = data_transformed['Replicate']
+    replicates_unique = list(replicates.unique())
+    cmap = plt.get_cmap(replicates_cmap_name).colors[:len(replicates_unique)]
+    rep_colours = dict(zip(replicates_unique, cmap))
+    print(rep_colours)
+    for rep, color in rep_colours.items():
+        plt.scatter([0], [0], c=[color], label=rep,
+                    alpha=1, edgecolors='none')
+ax.legend(ncol=3)
+ax.axis('off')
+plt.savefig(path_save + 'GAM_replicates_legend.pdf')
+plt.close()
+
+# *** Strain plots with developmental stages annotation (UNUSED)
 # See combined stages plot for legend
 matplotlib.rcParams.update({'font.size': 15})
 for strain in conditions['Strain'].unique():
@@ -618,7 +637,7 @@ plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.savefig(path_save + 'GAM_combined.pdf')
 plt.close()
 
-# *** Plot PC1 vs time of all strains with stage annotations
+# *** Plot PC1 vs time of all strains with stage annotations (UNUSED)
 matplotlib.rcParams.update({'font.size': 15})
 fig, ax = plt.subplots(figsize=(10, 10))
 dim_reduction_plot(DATA_TRANSFORMED.drop('alpha', axis=1), plot_by='Strain', fig_ax=(fig, ax), order_column='x',

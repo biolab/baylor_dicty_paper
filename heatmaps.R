@@ -398,7 +398,9 @@ pdf(paste0(path_save,
 draw(ht_list)
 graphics.off()
 
-# *** Heatmap for genes upregulated in tag_dis group compared to whole AX4 profile
+# *** Heatmap for genes upregulated in tag_dis group compared to whole AX4 profile - UNUSED
+if(FALSE){
+
 ht_list <- make_annotation()
 
 # Find DE genes
@@ -423,6 +425,7 @@ heatmap <- Heatmap(t(avg_expression[, genes]), cluster_columns = FALSE, cluster_
 )
 ht_list <- ht_list %v% heatmap
 
+}
 # Plot the heatmap
 pdf(paste0(path_save,
            'expressionHeatmap_tagdisVSAX4all_alternativegreater_FDRoptim0.01DE_tgrB1hr8hr10hr12andtgrB1C1hr8hr10hr12_ref_AX4all_DEpadj', padj,
